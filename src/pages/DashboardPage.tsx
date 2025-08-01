@@ -87,22 +87,27 @@ const DashboardPage: React.FC = () => {
       {/* Header */}
       <div className="bg-white shadow-sm border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
+          <div className="flex items-center justify-between h-14 sm:h-16">
             <div className="flex items-center">
-              <h1 className="text-xl font-semibold text-gray-900">
+              <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center mr-3">
+                <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                </svg>
+              </div>
+              <h1 className="text-lg sm:text-xl font-semibold text-gray-900">
                 Furniture OCR
               </h1>
             </div>
             
-            <div className="flex items-center space-x-4">
-              <div className="flex items-center space-x-2 text-sm text-gray-600">
+            <div className="flex items-center space-x-2 sm:space-x-4">
+              <div className="hidden sm:flex items-center space-x-2 text-sm text-gray-600">
                 <User className="w-4 h-4" />
-                <span>{user?.displayName || user?.email}</span>
+                <span className="truncate max-w-32">{user?.displayName || user?.email}</span>
               </div>
               
               <Button variant="ghost" size="sm" onClick={logout}>
-                <LogOut className="w-4 h-4 mr-2" />
-                Logout
+                <LogOut className="w-4 h-4 sm:mr-2" />
+                <span className="hidden sm:inline">Logout</span>
               </Button>
             </div>
           </div>
@@ -110,9 +115,9 @@ const DashboardPage: React.FC = () => {
       </div>
 
       {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8">
         {/* Tab Navigation */}
-        <div className="flex space-x-1 mb-8 bg-gray-100 rounded-lg p-1">
+        <div className="flex space-x-1 mb-6 sm:mb-8 bg-gray-100 rounded-lg p-1">
           <button
             onClick={() => setActiveTab('new')}
             className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
@@ -121,8 +126,9 @@ const DashboardPage: React.FC = () => {
                 : 'text-gray-600 hover:text-gray-900'
             }`}
           >
-            <Plus className="w-4 h-4 inline mr-2" />
-            New Project
+            <Plus className="w-4 h-4 inline mr-1 sm:mr-2" />
+            <span className="hidden xs:inline">New Project</span>
+            <span className="xs:hidden">New</span>
           </button>
           <button
             onClick={() => setActiveTab('projects')}
@@ -132,8 +138,9 @@ const DashboardPage: React.FC = () => {
                 : 'text-gray-600 hover:text-gray-900'
             }`}
           >
-            <FolderOpen className="w-4 h-4 inline mr-2" />
-            My Projects ({projects.length})
+            <FolderOpen className="w-4 h-4 inline mr-1 sm:mr-2" />
+            <span className="hidden xs:inline">My Projects ({projects.length})</span>
+            <span className="xs:hidden">Projects ({projects.length})</span>
           </button>
         </div>
 
@@ -141,12 +148,12 @@ const DashboardPage: React.FC = () => {
         {activeTab === 'new' && (
           <div className="space-y-6">
             {!currentImage ? (
-              <Card className="text-center py-12">
-                <Camera className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-                <h3 className="text-lg font-medium text-gray-900 mb-2">
+              <Card className="text-center py-8 sm:py-12">
+                <Camera className="mx-auto h-10 w-10 sm:h-12 sm:w-12 text-gray-400 mb-4" />
+                <h3 className="text-lg sm:text-xl font-medium text-gray-900 mb-2">
                   Capture Construction Documents
                 </h3>
-                <p className="text-gray-600 mb-6 max-w-md mx-auto">
+                <p className="text-sm sm:text-base text-gray-600 mb-6 max-w-md mx-auto px-4">
                   Take a photo or upload an image of furniture construction documents, 
                   plans, or specifications to extract text and organize information.
                 </p>
@@ -155,6 +162,7 @@ const DashboardPage: React.FC = () => {
                   onClick={() => setShowCamera(true)}
                   size="lg"
                   disabled={isProcessing}
+                  className="w-full sm:w-auto"
                 >
                   <Camera className="w-5 h-5 mr-2" />
                   Start Capture
@@ -170,13 +178,14 @@ const DashboardPage: React.FC = () => {
                     onChange={(e) => setProjectTitle(e.target.value)}
                     placeholder="Enter a title for this project"
                     helperText="Leave blank to auto-generate based on date"
+                    className="text-base"
                   />
                 </Card>
 
                 {/* Image Preview */}
                 <Card>
-                  <h3 className="text-lg font-medium text-gray-900 mb-4">Captured Image</h3>
-                  <div className="aspect-video bg-gray-100 rounded-lg overflow-hidden">
+                  <h3 className="text-base sm:text-lg font-medium text-gray-900 mb-4">Captured Image</h3>
+                  <div className="aspect-video bg-gray-100 rounded-lg overflow-hidden mb-4">
                     <img
                       src={currentImage}
                       alt="Captured document"
@@ -184,7 +193,7 @@ const DashboardPage: React.FC = () => {
                     />
                   </div>
                   
-                  <div className="mt-4 flex items-center justify-between">
+                  <div className="flex flex-col sm:flex-row items-center justify-between space-y-3 sm:space-y-0">
                     <Button
                       variant="outline"
                       onClick={() => {
@@ -192,12 +201,13 @@ const DashboardPage: React.FC = () => {
                         setOcrResult(null);
                         setProjectTitle('');
                       }}
+                      className="w-full sm:w-auto"
                     >
                       Capture New Image
                     </Button>
                     
                     {isProcessing && (
-                      <div className="flex items-center text-sm text-gray-600">
+                      <div className="flex items-center text-sm text-gray-600 w-full sm:w-auto justify-center">
                         <LoadingSpinner size="sm" className="mr-2" />
                         Processing image...
                       </div>
@@ -213,21 +223,21 @@ const DashboardPage: React.FC = () => {
         {activeTab === 'projects' && (
           <div>
             {projects.length === 0 ? (
-              <Card className="text-center py-12">
-                <FolderOpen className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-                <h3 className="text-lg font-medium text-gray-900 mb-2">
+              <Card className="text-center py-8 sm:py-12">
+                <FolderOpen className="mx-auto h-10 w-10 sm:h-12 sm:w-12 text-gray-400 mb-4" />
+                <h3 className="text-lg sm:text-xl font-medium text-gray-900 mb-2">
                   No Projects Yet
                 </h3>
-                <p className="text-gray-600 mb-6">
+                <p className="text-sm sm:text-base text-gray-600 mb-6 px-4">
                   Start by capturing your first construction document.
                 </p>
-                <Button onClick={() => setActiveTab('new')}>
+                <Button onClick={() => setActiveTab('new')} className="w-full sm:w-auto">
                   <Plus className="w-4 h-4 mr-2" />
                   Create First Project
                 </Button>
               </Card>
             ) : (
-              <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+              <div className="grid gap-4 sm:gap-6 sm:grid-cols-2 lg:grid-cols-3">
                 {projects.map((project) => (
                   <ProjectCard
                     key={project.id}
