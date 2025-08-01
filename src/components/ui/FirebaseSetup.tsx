@@ -19,19 +19,19 @@ const FirebaseSetup: React.FC = () => {
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <Card className="w-full max-w-md">
+      <Card className="w-full max-w-sm sm:max-w-md mx-4">
         <div className="text-center">
-          <AlertTriangle className="mx-auto h-12 w-12 text-orange-500 mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">
+          <AlertTriangle className="mx-auto h-10 w-10 sm:h-12 sm:w-12 text-orange-500 mb-4" />
+          <h3 className="text-base sm:text-lg font-medium text-gray-900 mb-2">
             Firebase Configuration Required
           </h3>
-          <p className="text-sm text-gray-600 mb-6">
+          <p className="text-sm sm:text-base text-gray-600 mb-6">
             To use this application, you need to set up Firebase and configure your environment variables.
           </p>
           
-          <div className="bg-gray-50 p-4 rounded-lg mb-6 text-left">
+          <div className="bg-gray-50 p-3 sm:p-4 rounded-lg mb-6 text-left">
             <h4 className="font-medium text-gray-900 mb-2">Missing Configuration:</h4>
-            <ul className="text-sm text-gray-600 space-y-1">
+            <ul className="text-xs sm:text-sm text-gray-600 space-y-1">
               {missingEnvVars.map(envVar => (
                 <li key={envVar} className="font-mono">
                   {envVar}
@@ -49,7 +49,7 @@ const FirebaseSetup: React.FC = () => {
               Open Firebase Console
             </Button>
             
-            <div className="text-xs text-gray-500">
+            <div className="text-xs sm:text-sm text-gray-500 space-y-1">
               <p>1. Create a Firebase project</p>
               <p>2. Enable Authentication, Firestore, and Storage</p>
               <p>3. Copy your config to the .env file</p>
