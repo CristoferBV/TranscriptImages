@@ -17,4 +17,18 @@
     -webkit-box-orient: vertical;
     overflow: hidden;
   }
+
+  /* Animación de escáner */
+  @keyframes scan {
+    0% {
+      top: 0%;
+    }
+    100% {
+      top: 100%;
+    }
+  }
+
+  .animate-scan {
+    animation: scan 2.8s linear infinite alternate;
+  }
 }

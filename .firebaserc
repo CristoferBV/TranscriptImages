@@ -1,0 +1,8 @@
+{
+  "projects": {
+    "default": "furniture-ocr",
+    "ocr-app": "furniture-ocr"
+  },
+  "targets": {},
+  "etags": {}
+}
