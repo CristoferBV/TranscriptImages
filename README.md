@@ -64,6 +64,9 @@ A comprehensive mobile-first web application designed for furniture construction
 ## Project Structure
 
 ```
+functions/
+├── src/
+│   ├── index.ts/        # Fucntion of processOCR to process the image
 src/
 ├── components/          # Reusable UI components
 │   ├── auth/           # Authentication components
