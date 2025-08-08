@@ -35,27 +35,27 @@ const DashboardPage: React.FC = () => {
     setProjects(userProjects);
   };
 
+  // IMPORTANTE: ya no cerramos la cámara aquí; devolvemos una promesa
   const handleImageCapture = async (file: File) => {
-    setShowCamera(false);
-    
-    // Upload image to Firebase Storage
+    // Sube la imagen
     const imageUrl = await uploadImage(file);
     if (!imageUrl) return;
 
     setCurrentImage(imageUrl);
-    
-    // Process image with OCR
+
+    // Procesa con OCR
     const result = await processImage(imageUrl);
     if (result) {
       setOcrResult(result);
     }
+    // CameraCapture cerrará el modal cuando esta promesa resuelva
   };
 
   const handleSaveProject = async (data: OCRResult) => {
     if (!currentImage) return;
 
     const title = projectTitle.trim() || `Project ${new Date().toLocaleDateString()}`;
-    
+
     const projectData = {
       title,
       imageUrl: currentImage,
@@ -67,15 +67,11 @@ const DashboardPage: React.FC = () => {
 
     const projectId = await saveProject(projectData);
     if (projectId) {
-      // Reset form
       setCurrentImage(null);
       setOcrResult(null);
       setProjectTitle('');
-      
-      // Reload projects
+
       await loadProjects();
-      
-      // Switch to projects tab
       setActiveTab('projects');
     }
   };
@@ -94,17 +90,26 @@ const DashboardPage: React.FC = () => {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
                 </svg>
               </div>
-              <h1 className="text-lg sm:text-xl font-semibold text-gray-900">
-                Furniture OCR
-              </h1>
+              <h1 className="text-lg sm:text-xl font-semibold text-gray-900">Furniture OCR</h1>
             </div>
-            
+
             <div className="flex items-center space-x-2 sm:space-x-4">
+              {/* Nombre de usuario – móvil */}
+              <div className="flex sm:hidden items-center space-x-1 text-sm text-gray-700">
+                <User className="w-4 h-4" />
+                <span className="truncate max-w-[120px]" title={user?.displayName || user?.email || ''}>
+                  {user?.displayName || user?.email}
+                </span>
+              </div>
+
+              {/* Nombre de usuario – desktop/tablet */}
               <div className="hidden sm:flex items-center space-x-2 text-sm text-gray-600">
                 <User className="w-4 h-4" />
-                <span className="truncate max-w-32">{user?.displayName || user?.email}</span>
+                <span className="truncate max-w-32" title={user?.displayName || user?.email || ''}>
+                  {user?.displayName || user?.email}
+                </span>
               </div>
-              
+
               <Button variant="ghost" size="sm" onClick={logout}>
                 <LogOut className="w-4 h-4 sm:mr-2" />
                 <span className="hidden sm:inline">Logout</span>
@@ -121,9 +126,7 @@ const DashboardPage: React.FC = () => {
           <button
             onClick={() => setActiveTab('new')}
             className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
-              activeTab === 'new'
-                ? 'bg-white text-blue-600 shadow-sm'
-                : 'text-gray-600 hover:text-gray-900'
+              activeTab === 'new' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-600 hover:text-gray-900'
             }`}
           >
             <Plus className="w-4 h-4 inline mr-1 sm:mr-2" />
@@ -133,9 +136,7 @@ const DashboardPage: React.FC = () => {
           <button
             onClick={() => setActiveTab('projects')}
             className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
-              activeTab === 'projects'
-                ? 'bg-white text-blue-600 shadow-sm'
-                : 'text-gray-600 hover:text-gray-900'
+              activeTab === 'projects' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-600 hover:text-gray-900'
             }`}
           >
             <FolderOpen className="w-4 h-4 inline mr-1 sm:mr-2" />
@@ -150,20 +151,13 @@ const DashboardPage: React.FC = () => {
             {!currentImage ? (
               <Card className="text-center py-8 sm:py-12">
                 <Camera className="mx-auto h-10 w-10 sm:h-12 sm:w-12 text-gray-400 mb-4" />
-                <h3 className="text-lg sm:text-xl font-medium text-gray-900 mb-2">
-                  Capture Construction Documents
-                </h3>
+                <h3 className="text-lg sm:text-xl font-medium text-gray-900 mb-2">Capture Construction Documents</h3>
                 <p className="text-sm sm:text-base text-gray-600 mb-6 max-w-md mx-auto px-4">
-                  Take a photo or upload an image of furniture construction documents, 
+                  Take a photo or upload an image of furniture construction documents,
                   plans, or specifications to extract text and organize information.
                 </p>
-                
-                <Button
-                  onClick={() => setShowCamera(true)}
-                  size="lg"
-                  disabled={isProcessing}
-                  className="w-full sm:w-auto"
-                >
+
+                <Button onClick={() => setShowCamera(true)} size="lg" disabled={isProcessing} className="w-full sm:w-auto">
                   <Camera className="w-5 h-5 mr-2" />
                   Start Capture
                 </Button>
@@ -186,13 +180,9 @@ const DashboardPage: React.FC = () => {
                 <Card>
                   <h3 className="text-base sm:text-lg font-medium text-gray-900 mb-4">Captured Image</h3>
                   <div className="aspect-video bg-gray-100 rounded-lg overflow-hidden mb-4">
-                    <img
-                      src={currentImage}
-                      alt="Captured document"
-                      className="w-full h-full object-cover"
-                    />
+                    <img src={currentImage} alt="Captured document" className="w-full h-full object-cover" />
                   </div>
-                  
+
                   <div className="flex flex-col sm:flex-row items-center justify-between space-y-3 sm:space-y-0">
                     <Button
                       variant="outline"
@@ -205,7 +195,7 @@ const DashboardPage: React.FC = () => {
                     >
                       Capture New Image
                     </Button>
-                    
+
                     {isProcessing && (
                       <div className="flex items-center text-sm text-gray-600 w-full sm:w-auto justify-center">
                         <LoadingSpinner size="sm" className="mr-2" />
@@ -225,9 +215,7 @@ const DashboardPage: React.FC = () => {
             {projects.length === 0 ? (
               <Card className="text-center py-8 sm:py-12">
                 <FolderOpen className="mx-auto h-10 w-10 sm:h-12 sm:w-12 text-gray-400 mb-4" />
-                <h3 className="text-lg sm:text-xl font-medium text-gray-900 mb-2">
-                  No Projects Yet
-                </h3>
+                <h3 className="text-lg sm:text-xl font-medium text-gray-900 mb-2">No Projects Yet</h3>
                 <p className="text-sm sm:text-base text-gray-600 mb-6 px-4">
                   Start by capturing your first construction document.
                 </p>
@@ -239,10 +227,7 @@ const DashboardPage: React.FC = () => {
             ) : (
               <div className="grid gap-4 sm:gap-6 sm:grid-cols-2 lg:grid-cols-3">
                 {projects.map((project) => (
-                  <ProjectCard
-                    key={project.id}
-                    project={project}
-                  />
+                  <ProjectCard key={project.id} project={project} />
                 ))}
               </div>
             )}
@@ -253,8 +238,8 @@ const DashboardPage: React.FC = () => {
       {/* Camera Modal */}
       {showCamera && (
         <CameraCapture
-          onCapture={handleImageCapture}
-          onClose={() => setShowCamera(false)}
+          onCapture={handleImageCapture}                 // devuelve Promise
+          onClose={() => setShowCamera(false)}           // se cierra cuando handleImageCapture resuelve
         />
       )}
 

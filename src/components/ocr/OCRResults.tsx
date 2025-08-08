@@ -11,23 +11,24 @@ interface OCRResultsProps {
   saving?: boolean;
 }
 
-const OCRResults: React.FC<OCRResultsProps> = ({ 
-  result, 
-  onSave, 
+const OCRResults: React.FC<OCRResultsProps> = ({
+  result,
+  onSave,
   onClose,
-  saving = false 
+  saving = false,
 }) => {
   const [editingData, setEditingData] = useState<OCRResult>(result);
   const [editingSection, setEditingSection] = useState<string | null>(null);
 
-  const handleArrayEdit = (section: keyof Pick<OCRResult, 'materials' | 'measurements' | 'instructions'>, value: string) => {
-    const items = value.split('\n').filter(item => item.trim() !== '');
-    setEditingData(prev => ({ ...prev, [section]: items }));
+  const handleArrayEdit = (
+    section: keyof Pick<OCRResult, 'materials' | 'measurements' | 'instructions'>,
+    value: string
+  ) => {
+    const items = value.split('\n').filter((item) => item.trim() !== '');
+    setEditingData((prev) => ({ ...prev, [section]: items }));
   };
 
-  const handleSave = () => {
-    onSave(editingData);
-  };
+  const handleSave = () => onSave(editingData);
 
   const sections = [
     {
@@ -51,8 +52,10 @@ const OCRResults: React.FC<OCRResultsProps> = ({
   ] as const;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end sm:items-center justify-center p-0 sm:p-4 z-50">
-      <div className="bg-white rounded-t-xl sm:rounded-lg shadow-xl w-full max-w-4xl max-h-[95vh] sm:max-h-[90vh] overflow-hidden">
+    <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center p-0 sm:p-4 z-50">
+      {/* Modal */}
+      <div className="bg-white rounded-t-xl sm:rounded-lg shadow-xl w-full max-w-4xl h-[95vh] sm:h-[90vh] overflow-hidden flex flex-col">
+        {/* Header */}
         <div className="flex items-center justify-between p-4 sm:p-6 border-b border-gray-200">
           <h2 className="text-lg sm:text-xl font-semibold text-gray-900">
             Extracted Content
@@ -60,30 +63,43 @@ const OCRResults: React.FC<OCRResultsProps> = ({
           <button
             onClick={onClose}
             className="p-2 hover:bg-gray-100 rounded-full transition-colors touch-manipulation"
+            aria-label="Close"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        <div className="p-4 sm:p-6 space-y-4 sm:space-y-6 overflow-y-auto max-h-[calc(95vh-140px)] sm:max-h-[calc(90vh-200px)]">
-          {/* Full Text Section */}
+        {/* Body (scrolleable) */}
+        <div className="flex-1 p-4 sm:p-6 space-y-4 sm:space-y-6 overflow-y-auto">
+          {/* Full Text */}
           <Card>
             <div className="flex items-center justify-between mb-3 sm:mb-4">
-              <h3 className="text-base sm:text-lg font-medium text-gray-900">Full Text</h3>
+              <h3 className="text-base sm:text-lg font-medium text-gray-900">
+                Full Text
+              </h3>
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => setEditingSection(editingSection === 'fullText' ? null : 'fullText')}
+                onClick={() =>
+                  setEditingSection(
+                    editingSection === 'fullText' ? null : 'fullText'
+                  )
+                }
                 className="touch-manipulation"
               >
                 <Edit3 className="w-4 h-4" />
               </Button>
             </div>
-            
+
             {editingSection === 'fullText' ? (
               <textarea
                 value={editingData.fullText}
-                onChange={(e) => setEditingData(prev => ({ ...prev, fullText: e.target.value }))}
+                onChange={(e) =>
+                  setEditingData((prev) => ({
+                    ...prev,
+                    fullText: e.target.value,
+                  }))
+                }
                 className="w-full h-32 sm:h-40 p-3 border border-gray-300 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm sm:text-base"
               />
             ) : (
@@ -93,21 +109,25 @@ const OCRResults: React.FC<OCRResultsProps> = ({
             )}
           </Card>
 
-          {/* Categorized Sections */}
+          {/* Secciones categorizadas */}
           {sections.map(({ key, title, color, textColor }) => (
             <Card key={key} className={color}>
               <div className="flex items-center justify-between mb-3 sm:mb-4">
-                <h3 className={`text-base sm:text-lg font-medium ${textColor}`}>{title}</h3>
+                <h3 className={`text-base sm:text-lg font-medium ${textColor}`}>
+                  {title}
+                </h3>
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => setEditingSection(editingSection === key ? null : key)}
+                  onClick={() =>
+                    setEditingSection(editingSection === key ? null : key)
+                  }
                   className="touch-manipulation"
                 >
                   <Edit3 className="w-4 h-4" />
                 </Button>
               </div>
-              
+
               {editingSection === key ? (
                 <textarea
                   value={editingData[key].join('\n')}
@@ -119,12 +139,17 @@ const OCRResults: React.FC<OCRResultsProps> = ({
                 <div className="space-y-2 sm:space-y-3">
                   {editingData[key].length > 0 ? (
                     editingData[key].map((item, index) => (
-                      <div key={index} className="bg-white p-2 sm:p-3 rounded-lg border shadow-sm">
+                      <div
+                        key={index}
+                        className="bg-white p-2 sm:p-3 rounded-lg border shadow-sm"
+                      >
                         {item}
                       </div>
                     ))
                   ) : (
-                    <p className="text-sm text-gray-500 italic">No {title.toLowerCase()} identified</p>
+                    <p className="text-sm text-gray-500 italic">
+                      No {title.toLowerCase()} identified
+                    </p>
                   )}
                 </div>
               )}
@@ -132,14 +157,29 @@ const OCRResults: React.FC<OCRResultsProps> = ({
           ))}
         </div>
 
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-end space-y-2 sm:space-y-0 sm:space-x-3 p-4 sm:p-6 border-t border-gray-200 safe-area-bottom">
-          <Button variant="outline" onClick={onClose} className="w-full sm:w-auto">
-            Cancel
-          </Button>
-          <Button onClick={handleSave} loading={saving} className="w-full sm:w-auto">
-            <Save className="w-4 h-4 mr-2" />
-            Save Project
-          </Button>
+        {/* Footer (stickied) */}
+        <div
+          className="sticky bottom-0 border-t border-gray-200 bg-white p-3 sm:p-4"
+          style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 0.5rem)' }}
+        >
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-end gap-2 sm:gap-3">
+            <Button
+              variant="outline"
+              onClick={onClose}
+              className="w-full sm:w-auto border-gray-300 text-gray-700 hover:bg-gray-100"
+            >
+              Cancel
+            </Button>
+
+            <Button
+              onClick={handleSave}
+              loading={saving}
+              className="w-full sm:w-auto bg-blue-600/90 hover:bg-blue-600 text-white shadow-md hover:shadow-lg"
+            >
+              <Save className="w-4 h-4 mr-2" />
+              Save Project
+            </Button>
+          </div>
         </div>
       </div>
     </div>

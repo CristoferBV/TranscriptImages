@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { Camera, Upload, X, Loader } from 'lucide-react';
+import { Camera, Upload, X } from 'lucide-react';
 import Button from '../ui/Button';
 import Card from '../ui/Card';
 import { useCamera } from '../../hooks/useCamera';
 
 interface CameraCaptureProps {
-  onCapture: (file: File) => void;
+  // ahora puede devolver Promise para que este componente muestre el overlay hasta que termine
+  onCapture: (file: File) => Promise<void> | void;
   onClose: () => void;
 }
 
@@ -20,6 +21,9 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
   } = useCamera();
 
   const [showLoading, setShowLoading] = useState(false);
+  const [loadingMessage, setLoadingMessage] = useState<
+    'Scanning...' | 'Uploading image...' | 'Processing image...'
+  >('Scanning...');
 
   useEffect(() => {
     requestCameraPermission();
@@ -30,27 +34,37 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
 
   const handleCapture = async () => {
     setShowLoading(true);
+    setLoadingMessage('Scanning...');
     const file = await capturePhoto();
-    setTimeout(() => {
+    if (!file) {
       setShowLoading(false);
-      if (file) {
-        onCapture(file);
-        onClose();
-      }
-    }, 1200); // delay para UX
+      return;
+    }
+    try {
+      await Promise.resolve(onCapture(file)); // espera a que el padre suba/procese
+    } finally {
+      setShowLoading(false);
+      onClose(); // cierra cuando terminó de verdad
+    }
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file && file.type.startsWith('image/')) {
-      onCapture(file);
+    if (!file || !file.type.startsWith('image/')) return;
+
+    setShowLoading(true);
+    setLoadingMessage('Uploading image...');
+    try {
+      await Promise.resolve(onCapture(file)); // el padre sube + OCR
+    } finally {
+      setShowLoading(false);
       onClose();
     }
   };
 
   if (hasPermission === false) {
     return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
         <Card className="w-full max-w-md">
           <div className="text-center">
             <Camera className="mx-auto h-12 w-12 text-gray-400 mb-4" />
@@ -59,19 +73,21 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
               Please allow camera access to capture images, or upload an existing image instead.
             </p>
             <div className="space-y-3">
-              <Button onClick={requestCameraPermission} className="w-full">Try Camera Again</Button>
-              <div className="relative">
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleFileUpload}
-                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                />
-                <Button variant="outline" className="w-full">
-                  <Upload className="w-4 h-4 mr-2" />Upload Image
-                </Button>
-              </div>
-              <Button variant="ghost" onClick={onClose} className="w-full">Cancel</Button>
+              <Button onClick={requestCameraPermission} className="w-full">
+                Try Camera Again
+              </Button>
+              <label className="relative w-full">
+                <input type="file" accept="image/*" onChange={handleFileUpload} className="hidden" />
+                <div className="w-full">
+                  <Button variant="outline" className="w-full">
+                    <Upload className="w-4 h-4 mr-2" />
+                    Upload Image
+                  </Button>
+                </div>
+              </label>
+              <Button variant="ghost" onClick={onClose} className="w-full">
+                Cancel
+              </Button>
             </div>
           </div>
         </Card>
@@ -83,9 +99,26 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
     <div className="fixed inset-0 bg-black flex flex-col z-50">
       {/* Overlay de loading */}
       {showLoading && (
-        <div className="absolute inset-0 bg-black bg-opacity-70 z-50 flex flex-col items-center justify-center text-white">
-          <Loader className="animate-spin h-10 w-10 mb-4" />
-          <p className="text-lg font-medium">Scanning...</p>
+        <div className="absolute inset-0 z-50 grid place-items-center bg-black/70 text-white">
+          <div className="rounded-2xl bg-white/5 backdrop-blur-md ring-1 ring-white/10 px-6 py-6 text-center shadow-2xl">
+            {/* Anillo animado + icono */}
+            <div className="relative mx-auto mb-4 h-20 w-20">
+              <div className="absolute inset-0 rounded-full border-2 border-white/20" />
+              <div className="absolute inset-0 rounded-full border-2 border-white/60 border-t-transparent animate-spin-slow" />
+              <div className="absolute inset-2 rounded-full bg-white/10" />
+              <div className="absolute inset-0 grid place-items-center">
+                <Camera className="h-7 w-7" />
+              </div>
+            </div>
+
+            <p className="text-base font-medium">{loadingMessage}</p>
+            <p className="mt-1 text-xs text-white/70">This may take a moment</p>
+
+            {/* Barra de progreso indeterminada */}
+            <div className="mt-4 h-1 w-56 overflow-hidden rounded-full bg-white/15">
+              <div className="h-full w-1/3 animate-progress bg-white/80" />
+            </div>
+          </div>
         </div>
       )}
 
@@ -93,83 +126,86 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
       <div className="absolute top-4 left-0 w-full px-4 z-40">
         {/* Texto centrado */}
         <div className="flex justify-center">
-          <p className="text-white text-base bg-black bg-opacity-60 px-4 py-1 rounded-md text-center">
+          <p className="flex items-center gap-2 text-white text-base bg-black/60 px-4 py-1.5 rounded-full">
+            <Camera className="w-4 h-4" />
             Position the document within the frame
           </p>
         </div>
 
         {/* Botón de cerrar */}
-        <div className="absolute -top-3 right-1">
+        <div className="absolute top-1 right-1">
           <button
             onClick={onClose}
-            className="p-2 bg-black bg-opacity-60 rounded-full text-white hover:bg-opacity-80"
+            className="rounded-lg p-1 text-red-600 hover:text-red-700 hover:bg-red-200 transition-colors"
+            aria-label="Close"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
       </div>
 
-      {/* Video & guía */}
+      {/* Video */}
       <div className="flex-1 relative">
-        <video
-          ref={videoRef}
-          autoPlay
-          playsInline
-          muted
-          className="w-full h-full object-cover"
-        />
+        <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
 
-        {/* Marco */}
-        <div className="absolute inset-10 sm:inset-20 border-2 border-white border-opacity-30 rounded-xl pointer-events-none mt-5 z-30">
-          {/* Esquinas */}
-          <div className="absolute top-0 left-0 w-6 h-6 border-t-2 border-l-2 border-white rounded-tl-md"></div>
-          <div className="absolute top-0 right-0 w-6 h-6 border-t-2 border-r-2 border-white rounded-tr-md"></div>
-          <div className="absolute bottom-0 left-0 w-6 h-6 border-b-2 border-l-2 border-white rounded-bl-md"></div>
-          <div className="absolute bottom-0 right-0 w-6 h-6 border-b-2 border-r-2 border-white rounded-br-md"></div>
-
-          {/* Ícono documento */}
-          <div className="absolute inset-0 flex items-center justify-center">
-            <div className="text-white bg-white bg-opacity-10 rounded-full p-2">
-              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="feather feather-file-text">
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                <polyline points="14 2 14 8 20 8" />
-                <line x1="16" y1="13" x2="8" y2="13" />
-                <line x1="16" y1="17" x2="8" y2="17" />
-                <polyline points="10 9 9 9 8 9" />
-              </svg>
+        {/* Marco centrado con aspect ratio */}
+        <div className="absolute inset-0 flex items-center justify-center z-30">
+          <div className="relative w-[88%] max-w-[720px] aspect-[3/4] rounded-2xl ring-2 ring-white/40 bg-black/10 backdrop-blur-[1px]">
+            {/* Esquinas limpias */}
+            <div className="pointer-events-none">
+              <div className="absolute top-0 left-0 w-12 h-12 border-t-[3px] border-l-[3px] border-white rounded-tl-lg" />
+              <div className="absolute top-0 right-0 w-12 h-12 border-t-[3px] border-r-[3px] border-white rounded-tr-lg" />
+              <div className="absolute bottom-0 left-0 w-12 h-12 border-b-[3px] border-l-[3px] border-white rounded-bl-lg" />
+              <div className="absolute bottom-0 right-0 w-12 h-12 border-b-[3px] border-r-[3px] border-white rounded-br-lg" />
             </div>
-          </div>
 
-          {/* Línea escaneo animada */}
-          <div className="absolute inset-x-0 top-0 h-1 bg-green-400 animate-scan z-40" />
+            {/* Ícono central */}
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+              <div className="w-24 h-24 rounded-full bg-white/15 backdrop-blur-sm ring-1 ring-white/30 shadow-lg flex items-center justify-center">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  className="w-10 h-10 text-white"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.6"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-2h6l2 2h4a2 2 0 0 1 2 2z" />
+                  <circle cx="12" cy="13" r="4" />
+                </svg>
+              </div>
+            </div>
+
+            {/* Línea de escaneo (pausada si cargando) */}
+            {!showLoading && <div className="absolute left-3 right-3 top-0 scanline animate-scan rounded" />}
+          </div>
         </div>
       </div>
 
       {/* Botones */}
       <div className="bg-black p-4 sm:p-6 safe-area-bottom mb-4">
-        <div className="flex items-center justify-center space-x-4 sm:space-x-6 max-w-md mx-auto">
-          <div className="relative">
-            <input
-              type="file"
-              accept="image/*"
-              onChange={handleFileUpload}
-              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer touch-manipulation"
-            />
-            <Button
-              size="lg"
-              className="px-6 py-3 bg-indigo-600 text-white hover:bg-indigo-700 transition-colors"
-            >
-              <Upload className="w-5 h-5 mr-2" />Upload
-            </Button>
-          </div>
-
+        <div
+          className={`flex items-center justify-center space-x-4 sm:space-x-6 max-w-md mx-auto ${
+            showLoading ? 'pointer-events-none opacity-60' : ''
+          }`}
+        >
+          {/* Upload */}
+          <label className="px-7 py-3.5 bg-yellow-500/80 text-white rounded-lg shadow-md border border-transparent hover:bg-yellow-500/60 hover:border-yellow-400 transition-all cursor-pointer flex items-center">
+            <Upload className="w-5 h-5 mr-2" />
+            Upload
+            <input type="file" accept="image/*" onChange={handleFileUpload} className="hidden" />
+          </label>
+          {/* Capture */}
           <Button
             onClick={handleCapture}
             loading={isCapturing}
             size="lg"
-            className="px-8 py-3 bg-blue-600 text-white hover:bg-blue-700 transition-colors"
+            className="px-8 py-3 bg-blue-600/80 text-white rounded-lg shadow-md border border-transparent hover:bg-blue-600/60 hover:border-blue-400 transition-all"
           >
-            <Camera className="w-5 h-5 mr-2" />Capture
+            <Camera className="w-5 h-5 mr-2" />
+            Capture
           </Button>
         </div>
       </div>
