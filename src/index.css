@@ -2,15 +2,11 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ---- Utilidades globales ---- */
 @layer utilities {
-  .safe-area-bottom {
-    padding-bottom: env(safe-area-inset-bottom);
-  }
-  
-  .touch-manipulation {
-    touch-action: manipulation;
-  }
-  
+  .safe-area-bottom { padding-bottom: env(safe-area-inset-bottom); }
+  .touch-manipulation { touch-action: manipulation; }
+
   .line-clamp-2 {
     display: -webkit-box;
     -webkit-line-clamp: 2;
@@ -18,21 +14,38 @@
     overflow: hidden;
   }
 
-  /* Animación de escáner */
-  @keyframes scan {
-    0% {
-      top: 0%;
-    }
-    100% {
-      top: 100%;
-    }
-  }
+  /* ---- Animations ---- */
 
+  /* Vertical scan (animates the top property) */
+  @keyframes scan {
+    0%   { top: 8%; }
+    100% { top: 92%; }
+  }
   .animate-scan {
     animation: scan 2.8s linear infinite alternate;
   }
 
-  /* Gradiente + glow para la línea de escaneo */
+  /* Spin the loader ring */
+  @keyframes spin-slow {
+    0%   { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+  .animate-spin-slow {
+    animation: spin-slow 1.2s linear infinite;
+  }
+
+  /* Indeterminate progress bar */
+  @keyframes progress {
+    0%   { transform: translateX(-100%); }
+    100% { transform: translateX(300%); }
+  }
+  .animate-progress {
+    animation: progress 1.2s ease-in-out infinite;
+  }
+
+  /* ---- Visual styles ---- */
+
+  /* Gradient + glow for the scan line */
   .scanline {
     height: 2px;
     background: linear-gradient(
@@ -44,22 +57,10 @@
     box-shadow: 0 0 16px 2px rgba(34, 197, 94, 0.5);
   }
 
-  @layer utilities {
-  @keyframes spin-slow {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
+  /* Respect users with reduced motion */
+  @media (prefers-reduced-motion: reduce) {
+    .animate-scan, .animate-spin-slow, .animate-progress {
+      animation: none !important;
+    }
   }
-  .animate-spin-slow {
-    animation: spin-slow 1.2s linear infinite;
-  }
-
-  @keyframes progress {
-    0%   { transform: translateX(-100%); }
-    100% { transform: translateX(300%); }
-  }
-  .animate-progress {
-    animation: progress 1.2s ease-in-out infinite;
-  }
-}
-
 }

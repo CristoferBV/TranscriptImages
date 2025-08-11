@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Camera, Plus, LogOut, User, FolderOpen } from 'lucide-react';
+import { Camera, Plus, LogOut, User, FolderOpen, Trash2 } from 'lucide-react';
 import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
 import LoadingSpinner from '../components/ui/LoadingSpinner';
@@ -20,11 +20,15 @@ const DashboardPage: React.FC = () => {
   const [projectTitle, setProjectTitle] = useState('');
   const [activeTab, setActiveTab] = useState<'new' | 'projects'>('new');
 
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState<ProjectData | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
   const { user } = useAuthState();
   const { logout } = useAuthActions();
   const { uploadImage, uploading } = useImageUpload();
   const { processImage, processing } = useOCR();
-  const { saveProject, getUserProjects, loading: firestoreLoading } = useFirestore();
+  const { saveProject, getUserProjects, deleteProject, loading: firestoreLoading } = useFirestore();
 
   useEffect(() => {
     loadProjects();
@@ -35,20 +39,12 @@ const DashboardPage: React.FC = () => {
     setProjects(userProjects);
   };
 
-  // IMPORTANTE: ya no cerramos la cámara aquí; devolvemos una promesa
   const handleImageCapture = async (file: File) => {
-    // Sube la imagen
     const imageUrl = await uploadImage(file);
     if (!imageUrl) return;
-
     setCurrentImage(imageUrl);
-
-    // Procesa con OCR
     const result = await processImage(imageUrl);
-    if (result) {
-      setOcrResult(result);
-    }
-    // CameraCapture cerrará el modal cuando esta promesa resuelva
+    if (result) setOcrResult(result);
   };
 
   const handleSaveProject = async (data: OCRResult) => {
@@ -70,9 +66,26 @@ const DashboardPage: React.FC = () => {
       setCurrentImage(null);
       setOcrResult(null);
       setProjectTitle('');
-
       await loadProjects();
       setActiveTab('projects');
+    }
+  };
+
+  const requestDeleteProject = (project: ProjectData) => {
+    setPendingDelete(project);
+    setConfirmOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!pendingDelete) return;
+    try {
+      setDeleting(true);
+      await deleteProject(pendingDelete.id!, pendingDelete.imageUrl);
+      await loadProjects();
+    } finally {
+      setDeleting(false);
+      setConfirmOpen(false);
+      setPendingDelete(null);
     }
   };
 
@@ -94,7 +107,6 @@ const DashboardPage: React.FC = () => {
             </div>
 
             <div className="flex items-center space-x-2 sm:space-x-4">
-              {/* Nombre de usuario – móvil */}
               <div className="flex sm:hidden items-center space-x-1 text-sm text-gray-700">
                 <User className="w-4 h-4" />
                 <span className="truncate max-w-[120px]" title={user?.displayName || user?.email || ''}>
@@ -102,7 +114,6 @@ const DashboardPage: React.FC = () => {
                 </span>
               </div>
 
-              {/* Nombre de usuario – desktop/tablet */}
               <div className="hidden sm:flex items-center space-x-2 text-sm text-gray-600">
                 <User className="w-4 h-4" />
                 <span className="truncate max-w-32" title={user?.displayName || user?.email || ''}>
@@ -121,7 +132,7 @@ const DashboardPage: React.FC = () => {
 
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8">
-        {/* Tab Navigation */}
+        {/* Tabs */}
         <div className="flex space-x-1 mb-6 sm:mb-8 bg-gray-100 rounded-lg p-1">
           <button
             onClick={() => setActiveTab('new')}
@@ -156,7 +167,6 @@ const DashboardPage: React.FC = () => {
                   Take a photo or upload an image of furniture construction documents,
                   plans, or specifications to extract text and organize information.
                 </p>
-
                 <Button onClick={() => setShowCamera(true)} size="lg" disabled={isProcessing} className="w-full sm:w-auto">
                   <Camera className="w-5 h-5 mr-2" />
                   Start Capture
@@ -164,7 +174,6 @@ const DashboardPage: React.FC = () => {
               </Card>
             ) : (
               <div className="space-y-6">
-                {/* Project Title Input */}
                 <Card>
                   <Input
                     label="Project Title"
@@ -176,7 +185,6 @@ const DashboardPage: React.FC = () => {
                   />
                 </Card>
 
-                {/* Image Preview */}
                 <Card>
                   <h3 className="text-base sm:text-lg font-medium text-gray-900 mb-4">Captured Image</h3>
                   <div className="aspect-video bg-gray-100 rounded-lg overflow-hidden mb-4">
@@ -227,7 +235,11 @@ const DashboardPage: React.FC = () => {
             ) : (
               <div className="grid gap-4 sm:gap-6 sm:grid-cols-2 lg:grid-cols-3">
                 {projects.map((project) => (
-                  <ProjectCard key={project.id} project={project} />
+                  <ProjectCard
+                    key={project.id}
+                    project={project}
+                    onDelete={requestDeleteProject}   // ← abre modal
+                  />
                 ))}
               </div>
             )}
@@ -237,10 +249,7 @@ const DashboardPage: React.FC = () => {
 
       {/* Camera Modal */}
       {showCamera && (
-        <CameraCapture
-          onCapture={handleImageCapture}                 // devuelve Promise
-          onClose={() => setShowCamera(false)}           // se cierra cuando handleImageCapture resuelve
-        />
+        <CameraCapture onCapture={handleImageCapture} onClose={() => setShowCamera(false)} />
       )}
 
       {/* OCR Results Modal */}
@@ -251,6 +260,47 @@ const DashboardPage: React.FC = () => {
           onClose={() => setOcrResult(null)}
           saving={firestoreLoading}
         />
+      )}
+
+      {/* Confirmation modal */}
+      {confirmOpen && pendingDelete && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4">
+          <div className="w-full max-w-md rounded-xl bg-white shadow-2xl">
+            <div className="px-5 pt-5">
+              <div className="flex items-center gap-3">
+                <div className="rounded-full bg-red-100 p-2 text-red-600">
+                  <Trash2 className="w-5 h-5" />
+                </div>
+                <h3 className="text-lg font-semibold text-gray-900">Delete project?</h3>
+              </div>
+              <p className="mt-3 px-1 text-sm text-gray-600">
+                You’re about to delete <span className="font-medium">“{pendingDelete.title}”</span>. This action
+                cannot be undone.
+              </p>
+            </div>
+
+            <div className="mt-5 flex items-center justify-end gap-3 border-t border-gray-200 px-5 py-4">
+              <Button
+                variant="outline"
+                className="min-w-[96px]"
+                onClick={() => {
+                  setConfirmOpen(false);
+                  setPendingDelete(null);
+                }}
+                disabled={deleting}
+              >
+                Cancel
+              </Button>
+              <Button
+                className="min-w-[96px] bg-red-600 text-white hover:bg-red-700"
+                onClick={confirmDelete}
+                loading={deleting}
+              >
+                Delete
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

@@ -75,12 +75,13 @@ export const useCamera = () => {
   };
 
   const stopCamera = () => {
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => track.stop());
-      streamRef.current = null;
+    const stream = videoRef.current?.srcObject as MediaStream | null;
+    stream?.getTracks().forEach(t => t.stop());
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
     }
-    setHasPermission(null);
   };
+
 
   return {
     videoRef,
