@@ -12,17 +12,16 @@ export const useExport = () => {
     try {
       const generatePDF = httpsCallable(functions, 'generatePDF');
       const result = await generatePDF({ project });
-      
-      const { downloadUrl } = result.data as { downloadUrl: string };
-      
-      // Create a temporary link to download the PDF
+      const { downloadUrl, filename } = result.data as { downloadUrl: string; filename?: string };
+
       const link = document.createElement('a');
       link.href = downloadUrl;
-      link.download = `${project.title || 'project'}.pdf`;
+      link.download = filename || `${project.title || 'project'}.pdf`;
+      link.target = '_self';
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      
+
       toast.success('PDF exported successfully');
     } catch (error) {
       console.error('Error exporting PDF:', error);
@@ -37,17 +36,16 @@ export const useExport = () => {
     try {
       const generateExcel = httpsCallable(functions, 'generateExcel');
       const result = await generateExcel({ project });
-      
-      const { downloadUrl } = result.data as { downloadUrl: string };
-      
-      // Create a temporary link to download the Excel file
+      const { downloadUrl, filename } = result.data as { downloadUrl: string; filename?: string };
+
       const link = document.createElement('a');
       link.href = downloadUrl;
-      link.download = `${project.title || 'project'}.xlsx`;
+      link.download = filename || `${project.title || 'project'}.xlsx`;
+      link.target = '_self';
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      
+
       toast.success('Excel file exported successfully');
     } catch (error) {
       console.error('Error exporting Excel:', error);

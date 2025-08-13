@@ -82,7 +82,6 @@ export const useCamera = () => {
     }
   };
 
-
   return {
     videoRef,
     isCapturing,
