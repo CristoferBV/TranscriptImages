@@ -10,10 +10,10 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@google-cloud/vision": "^5.3.3",
+    "@google-cloud/vision": "^5.3.6",
     "exceljs": "^4.4.0",
     "firebase": "^12.0.0",
-    "jspdf": "^3.0.1",
+    "jspdf": "^4.2.1",
     "lucide-react": "^0.535.0",
     "pdfkit": "^0.17.1",
     "react": "^18.3.1",
