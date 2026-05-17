@@ -24,19 +24,25 @@ export const useAuthActions = () => {
       await signInWithEmailAndPassword(auth, email, password);
       toast.success('Welcome back!');
       return { success: true };
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Login error:', error);
-      const message = error.code === 'auth/user-not-found' 
-        ? 'No account found with this email'
-        : error.code === 'auth/wrong-password'
-        ? 'Incorrect password'
-        : error.code === 'auth/invalid-email'
-        ? 'Invalid email address'
-        : error.code === 'auth/invalid-credential'
-        ? 'Invalid email or password'
-        : error.code === 'auth/too-many-requests'
-        ? 'Too many failed attempts. Please try again later.'
-        : 'Login failed. Please try again.';
+      let message = 'Login failed. Please try again.';
+      if (error && typeof error === 'object' && 'code' in error) {
+        const code = (error as { code: string }).code;
+        if (typeof code === 'string') {
+        message = code === 'auth/user-not-found'
+          ? 'No account found with this email'
+          : code === 'auth/wrong-password'
+          ? 'Incorrect password'
+          : code === 'auth/invalid-email'
+          ? 'Invalid email address'
+          : code === 'auth/invalid-credential'
+          ? 'Invalid email or password'
+          : code === 'auth/too-many-requests'
+          ? 'Too many failed attempts. Please try again later.'
+          : message;
+        }
+      }
       
       toast.error(message);
       return { success: false, error: message };
@@ -53,18 +59,22 @@ export const useAuthActions = () => {
       await updateProfile(result.user, { displayName });
       toast.success('Account created successfully!');
       return { success: true };
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Registration error:', error);
-      const message = error.code === 'auth/email-already-in-use'
-        ? 'An account with this email already exists'
-        : error.code === 'auth/weak-password'
-        ? 'Password should be at least 6 characters'
-        : error.code === 'auth/invalid-email'
-        ? 'Invalid email address'
-        : error.code === 'auth/operation-not-allowed'
-        ? 'Email/password accounts are not enabled. Please contact support.'
-        : 'Registration failed. Please try again.';
-      
+      let message = 'Registration failed. Please try again.';
+      if (error && typeof error === 'object' && 'code' in error && typeof (error as { code?: unknown }).code === 'string') {
+        const code = (error as { code: string }).code;
+        message = code === 'auth/email-already-in-use'
+          ? 'An account with this email already exists'
+          : code === 'auth/weak-password'
+          ? 'Password should be at least 6 characters'
+          : code === 'auth/invalid-email'
+          ? 'Invalid email address'
+          : code === 'auth/operation-not-allowed'
+          ? 'Email/password accounts are not enabled. Please contact support.'
+          : message;
+      }
+
       toast.error(message);
       return { success: false, error: message };
     } finally {
@@ -76,7 +86,8 @@ export const useAuthActions = () => {
     try {
       await signOut(auth);
       toast.success('Logged out successfully');
-    } catch (error) {
+    } catch (err) {
+      console.error('Logout error:', err);
       toast.error('Logout failed');
     }
   };
