@@ -42,7 +42,9 @@ const DashboardPage: React.FC = () => {
   const handleImageCapture = async (file: File) => {
     const imageUrl = await uploadImage(file);
     if (!imageUrl) return;
+
     setCurrentImage(imageUrl);
+
     const result = await processImage(imageUrl);
     if (result) setOcrResult(result);
   };
@@ -50,7 +52,7 @@ const DashboardPage: React.FC = () => {
   const handleSaveProject = async (data: OCRResult) => {
     if (!currentImage) return;
 
-    const title = projectTitle.trim() || `Project ${new Date().toLocaleDateString()}`;
+    const title = projectTitle.trim() || `Proyecto ${new Date().toLocaleDateString()}`;
 
     const projectData = {
       title,
@@ -62,6 +64,7 @@ const DashboardPage: React.FC = () => {
     };
 
     const projectId = await saveProject(projectData);
+
     if (projectId) {
       setCurrentImage(null);
       setOcrResult(null);
@@ -78,6 +81,7 @@ const DashboardPage: React.FC = () => {
 
   const confirmDelete = async () => {
     if (!pendingDelete) return;
+
     try {
       setDeleting(true);
       await deleteProject(pendingDelete.id!, pendingDelete.imageUrl);
@@ -100,10 +104,15 @@ const DashboardPage: React.FC = () => {
             <div className="flex items-center">
               <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center mr-3">
                 <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
+                  />
                 </svg>
               </div>
-              <h1 className="text-lg sm:text-xl font-semibold text-gray-900">Furniture OCR</h1>
+              <h1 className="text-lg sm:text-xl font-semibold text-gray-900">Digidoc CR</h1>
             </div>
 
             <div className="flex items-center space-x-2 sm:space-x-4">
@@ -123,7 +132,7 @@ const DashboardPage: React.FC = () => {
 
               <Button variant="ghost" size="sm" onClick={logout}>
                 <LogOut className="w-4 h-4 sm:mr-2" />
-                <span className="hidden sm:inline">Logout</span>
+                <span className="hidden sm:inline">Cerrar sesión</span>
               </Button>
             </div>
           </div>
@@ -137,22 +146,27 @@ const DashboardPage: React.FC = () => {
           <button
             onClick={() => setActiveTab('new')}
             className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
-              activeTab === 'new' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-600 hover:text-gray-900'
+              activeTab === 'new'
+                ? 'bg-white text-blue-600 shadow-sm'
+                : 'text-gray-600 hover:text-gray-900'
             }`}
           >
             <Plus className="w-4 h-4 inline mr-1 sm:mr-2" />
-            <span className="hidden xs:inline">New Project</span>
-            <span className="xs:hidden">New</span>
+            <span className="hidden xs:inline">Nuevo proyecto</span>
+            <span className="xs:hidden">Nuevo</span>
           </button>
+
           <button
             onClick={() => setActiveTab('projects')}
             className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
-              activeTab === 'projects' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-600 hover:text-gray-900'
+              activeTab === 'projects'
+                ? 'bg-white text-blue-600 shadow-sm'
+                : 'text-gray-600 hover:text-gray-900'
             }`}
           >
             <FolderOpen className="w-4 h-4 inline mr-1 sm:mr-2" />
-            <span className="hidden xs:inline">My Projects ({projects.length})</span>
-            <span className="xs:hidden">Projects ({projects.length})</span>
+            <span className="hidden xs:inline">Mis proyectos ({projects.length})</span>
+            <span className="xs:hidden">Proyectos ({projects.length})</span>
           </button>
         </div>
 
@@ -162,33 +176,42 @@ const DashboardPage: React.FC = () => {
             {!currentImage ? (
               <Card className="text-center py-8 sm:py-12">
                 <Camera className="mx-auto h-10 w-10 sm:h-12 sm:w-12 text-gray-400 mb-4" />
-                <h3 className="text-lg sm:text-xl font-medium text-gray-900 mb-2">Capture Construction Documents</h3>
+
+                <h3 className="text-lg sm:text-xl font-medium text-gray-900 mb-2">
+                  Digitalizar documentos
+                </h3>
+
                 <p className="text-sm sm:text-base text-gray-600 mb-6 max-w-md mx-auto px-4">
-                  Take a photo or upload an image of furniture construction documents,
-                  plans, or specifications to extract text and organize information.
+                  Tome una foto o cargue una imagen, PDF o documento escaneado para
+                  extraer, organizar y convertir información en datos digitales listos
+                  para procesar y exportar.
                 </p>
+
                 <Button onClick={() => setShowCamera(true)} size="lg" disabled={isProcessing} className="w-full sm:w-auto">
                   <Camera className="w-5 h-5 mr-2" />
-                  Start Capture
+                  Iniciar digitalización
                 </Button>
               </Card>
             ) : (
               <div className="space-y-6">
                 <Card>
                   <Input
-                    label="Project Title"
+                    label="Título del proyecto"
                     value={projectTitle}
                     onChange={(e) => setProjectTitle(e.target.value)}
-                    placeholder="Enter a title for this project"
-                    helperText="Leave blank to auto-generate based on date"
+                    placeholder="Ingrese un nombre para este proyecto"
+                    helperText="Déjelo vacío para generar un nombre automáticamente"
                     className="text-base"
                   />
                 </Card>
 
                 <Card>
-                  <h3 className="text-base sm:text-lg font-medium text-gray-900 mb-4">Captured Image</h3>
+                  <h3 className="text-base sm:text-lg font-medium text-gray-900 mb-4">
+                    Documento cargado
+                  </h3>
+
                   <div className="aspect-video bg-gray-100 rounded-lg overflow-hidden mb-4">
-                    <img src={currentImage} alt="Captured document" className="w-full h-full object-cover" />
+                    <img src={currentImage} alt="Documento cargado" className="w-full h-full object-cover" />
                   </div>
 
                   <div className="flex flex-col sm:flex-row items-center justify-between space-y-3 sm:space-y-0">
@@ -201,13 +224,13 @@ const DashboardPage: React.FC = () => {
                       }}
                       className="w-full sm:w-auto"
                     >
-                      Capture New Image
+                      Cargar otro documento
                     </Button>
 
                     {isProcessing && (
                       <div className="flex items-center text-sm text-gray-600 w-full sm:w-auto justify-center">
                         <LoadingSpinner size="sm" className="mr-2" />
-                        Processing image...
+                        Procesando documento...
                       </div>
                     )}
                   </div>
@@ -223,13 +246,18 @@ const DashboardPage: React.FC = () => {
             {projects.length === 0 ? (
               <Card className="text-center py-8 sm:py-12">
                 <FolderOpen className="mx-auto h-10 w-10 sm:h-12 sm:w-12 text-gray-400 mb-4" />
-                <h3 className="text-lg sm:text-xl font-medium text-gray-900 mb-2">No Projects Yet</h3>
+
+                <h3 className="text-lg sm:text-xl font-medium text-gray-900 mb-2">
+                  Aún no hay proyectos
+                </h3>
+
                 <p className="text-sm sm:text-base text-gray-600 mb-6 px-4">
-                  Start by capturing your first construction document.
+                  Comience digitalizando su primer documento.
                 </p>
+
                 <Button onClick={() => setActiveTab('new')} className="w-full sm:w-auto">
                   <Plus className="w-4 h-4 mr-2" />
-                  Create First Project
+                  Crear primer proyecto
                 </Button>
               </Card>
             ) : (
@@ -238,7 +266,7 @@ const DashboardPage: React.FC = () => {
                   <ProjectCard
                     key={project.id}
                     project={project}
-                    onDelete={requestDeleteProject}   // ← abre modal
+                    onDelete={requestDeleteProject}
                   />
                 ))}
               </div>
@@ -271,11 +299,16 @@ const DashboardPage: React.FC = () => {
                 <div className="rounded-full bg-red-100 p-2 text-red-600">
                   <Trash2 className="w-5 h-5" />
                 </div>
-                <h3 className="text-lg font-semibold text-gray-900">Delete project?</h3>
+
+                <h3 className="text-lg font-semibold text-gray-900">
+                  ¿Eliminar proyecto?
+                </h3>
               </div>
+
               <p className="mt-3 px-1 text-sm text-gray-600">
-                You’re about to delete <span className="font-medium">“{pendingDelete.title}”</span>. This action
-                cannot be undone.
+                Está a punto de eliminar{' '}
+                <span className="font-medium">“{pendingDelete.title}”</span>.
+                Esta acción no se puede deshacer.
               </p>
             </div>
 
@@ -289,14 +322,15 @@ const DashboardPage: React.FC = () => {
                 }}
                 disabled={deleting}
               >
-                Cancel
+                Cancelar
               </Button>
+
               <Button
                 className="min-w-[96px] bg-red-600 text-white hover:bg-red-700"
                 onClick={confirmDelete}
                 loading={deleting}
               >
-                Delete
+                Eliminar
               </Button>
             </div>
           </div>
