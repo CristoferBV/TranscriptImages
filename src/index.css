@@ -1,8 +1,107 @@
+/* ── Google Fonts: Inter ─────────────────────────────────────────────── */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* ---- Utilidades globales ---- */
+/* ── Base reset (dark mode always on) ───────────────────────────────── */
+@layer base {
+  html {
+    color-scheme: dark;
+  }
+
+  body {
+    @apply bg-app-bg text-on-surface font-sans antialiased;
+  }
+
+  ::selection {
+    background-color: rgba(0, 210, 255, 0.25);
+  }
+}
+
+/* ── Auth layout glass utilities ─────────────────────────────────────── */
+@layer components {
+  /* Frosted-glass card */
+  .auth-glass-card {
+    background: rgba(29, 32, 34, 0.65);
+    backdrop-filter: blur(40px);
+    -webkit-backdrop-filter: blur(40px);
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    box-shadow:
+      inset 1px 1px 0px rgba(255, 255, 255, 0.08),
+      0 8px 40px -4px rgba(0, 0, 0, 0.6),
+      0 0 0 1px rgba(71, 214, 255, 0.04);
+  }
+
+  /* Frosted-glass input wrapper */
+  .auth-input-glass {
+    background: rgba(16, 20, 21, 0.45);
+    border: 1px solid rgba(133, 147, 153, 0.28);
+    transition: border-color 0.25s ease, box-shadow 0.25s ease;
+  }
+  .auth-input-glass:focus-within {
+    border-color: #47d6ff;
+    box-shadow: 0 0 0 2px rgba(71, 214, 255, 0.18),
+                inset 0 0 10px rgba(71, 214, 255, 0.07);
+  }
+  .auth-input-glass.has-error {
+    border-color: #ffb4ab;
+    box-shadow: 0 0 0 2px rgba(255, 180, 171, 0.18);
+  }
+
+  /* Primary gradient CTA button */
+  .btn-auth-primary {
+    background: linear-gradient(135deg, #47d6ff 0%, #dcb8ff 100%);
+    color: #001f28;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    position: relative;
+    overflow: hidden;
+    transition: box-shadow 0.3s ease, transform 0.2s ease;
+  }
+  .btn-auth-primary::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, #a5e7ff 0%, #efdbff 100%);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+  }
+  .btn-auth-primary:hover {
+    box-shadow: 0 0 24px rgba(71, 214, 255, 0.45);
+    transform: translateY(-1px);
+  }
+  .btn-auth-primary:hover::before { opacity: 1; }
+  .btn-auth-primary:active { transform: scale(0.97); }
+  .btn-auth-primary > * { position: relative; z-index: 1; }
+  .btn-auth-primary:disabled {
+    opacity: 0.55;
+    pointer-events: none;
+  }
+
+  /* Ambient glow orbs (used in auth pages) */
+  .auth-ambient-orb-1 {
+    position: fixed;
+    top: -10%; left: -10%;
+    width: 50vw; height: 50vw;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(71,214,255,0.07) 0%, transparent 70%);
+    filter: blur(60px);
+    pointer-events: none;
+  }
+  .auth-ambient-orb-2 {
+    position: fixed;
+    bottom: -20%; right: -10%;
+    width: 60vw; height: 60vw;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(220,184,255,0.05) 0%, transparent 70%);
+    filter: blur(80px);
+    pointer-events: none;
+  }
+}
+
+/* ── Shared utilities ────────────────────────────────────────────────── */
 @layer utilities {
   .safe-area-bottom { padding-bottom: env(safe-area-inset-bottom); }
   .touch-manipulation { touch-action: manipulation; }
@@ -14,38 +113,25 @@
     overflow: hidden;
   }
 
-  /* ---- Animations ---- */
-
   /* Vertical scan (animates the top property) */
   @keyframes scan {
     0%   { top: 8%; }
     100% { top: 92%; }
   }
-  .animate-scan {
-    animation: scan 2.8s linear infinite alternate;
-  }
+  .animate-scan { animation: scan 2.8s linear infinite alternate; }
 
-  /* Spin the loader ring */
   @keyframes spin-slow {
-    0%   { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
+    from { transform: rotate(0deg); }
+    to   { transform: rotate(360deg); }
   }
-  .animate-spin-slow {
-    animation: spin-slow 1.2s linear infinite;
-  }
+  .animate-spin-slow { animation: spin-slow 1.2s linear infinite; }
 
-  /* Indeterminate progress bar */
   @keyframes progress {
     0%   { transform: translateX(-100%); }
     100% { transform: translateX(300%); }
   }
-  .animate-progress {
-    animation: progress 1.2s ease-in-out infinite;
-  }
+  .animate-progress { animation: progress 1.2s ease-in-out infinite; }
 
-  /* ---- Visual styles ---- */
-
-  /* Gradient + glow for the scan line */
   .scanline {
     height: 2px;
     background: linear-gradient(
@@ -57,10 +143,10 @@
     box-shadow: 0 0 16px 2px rgba(34, 197, 94, 0.5);
   }
 
-  /* Respect users with reduced motion */
   @media (prefers-reduced-motion: reduce) {
     .animate-scan, .animate-spin-slow, .animate-progress {
       animation: none !important;
     }
   }
 }
+

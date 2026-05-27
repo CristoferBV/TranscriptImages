@@ -13,14 +13,14 @@ function AppContent() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-app-bg flex items-center justify-center">
         <LoadingSpinner size="lg" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-app-bg">
       <FirebaseSetup />
       <Router>
         <Routes>
@@ -42,14 +42,15 @@ function AppContent() {
           />
         </Routes>
       </Router>
-      <Toaster 
+      <Toaster
         position="top-center"
         toastOptions={{
           duration: 4000,
           style: {
-            background: '#1F2937',
-            color: '#F9FAFB',
-            borderRadius: '0.5rem',
+            background: '#1d2022',
+            color: '#e0e3e5',
+            border: '1px solid rgba(255,255,255,0.09)',
+            borderRadius: '0.75rem',
           },
         }}
       />
