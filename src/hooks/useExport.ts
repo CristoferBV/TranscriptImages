@@ -22,10 +22,10 @@ export const useExport = () => {
       link.click();
       document.body.removeChild(link);
 
-      toast.success('PDF exported successfully');
+      toast.success('PDF exportado correctamente');
     } catch (error) {
       console.error('Error exporting PDF:', error);
-      toast.error('Failed to export PDF');
+      toast.error('Error al exportar PDF');
     } finally {
       setExporting(false);
     }
@@ -46,10 +46,10 @@ export const useExport = () => {
       link.click();
       document.body.removeChild(link);
 
-      toast.success('Excel file exported successfully');
+      toast.success('Excel exportado correctamente');
     } catch (error) {
       console.error('Error exporting Excel:', error);
-      toast.error('Failed to export Excel file');
+      toast.error('Error al exportar Excel');
     } finally {
       setExporting(false);
     }

@@ -10,7 +10,7 @@ export const useImageUpload = () => {
 
   const uploadImage = async (file: File): Promise<string | null> => {
     if (!user) {
-      toast.error('You must be logged in to upload images');
+      toast.error('Debe iniciar sesión para subir imágenes');
       return null;
     }
 
@@ -24,11 +24,11 @@ export const useImageUpload = () => {
       const snapshot = await uploadBytes(storageRef, file);
       const downloadURL = await getDownloadURL(snapshot.ref);
       
-      toast.success('Image uploaded successfully');
+      toast.success('Imagen subida correctamente');
       return downloadURL;
     } catch (error) {
       console.error('Error uploading image:', error);
-      toast.error('Failed to upload image');
+      toast.error('Error al subir la imagen');
       return null;
     } finally {
       setUploading(false);

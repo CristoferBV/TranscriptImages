@@ -26,14 +26,14 @@ export const useCamera = () => {
     } catch (error) {
       console.error('Camera permission denied:', error);
       setHasPermission(false);
-      toast.error('Camera access is required to capture images');
+      toast.error('Se requiere acceso a la cámara para capturar imágenes');
       return null;
     }
   };
 
   const capturePhoto = async (): Promise<File | null> => {
     if (!videoRef.current || !streamRef.current) {
-      toast.error('Camera not ready');
+      toast.error('Cámara no lista');
       return null;
     }
 
@@ -67,7 +67,7 @@ export const useCamera = () => {
       });
     } catch (error) {
       console.error('Error capturing photo:', error);
-      toast.error('Failed to capture photo');
+      toast.error('Error al capturar la foto');
       return null;
     } finally {
       setIsCapturing(false);

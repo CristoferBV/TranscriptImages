@@ -49,11 +49,11 @@ export const useFirestore = () => {
         updatedAt: Timestamp.now(),
       });
 
-      toast.success('Project saved successfully');
+      toast.success('Proyecto guardado correctamente');
       return docRef.id;
     } catch (error) {
       console.error('Error saving project:', error);
-      toast.error('Failed to save project');
+      toast.error('Error al guardar el proyecto');
       return null;
     } finally {
       setLoading(false);
@@ -69,11 +69,11 @@ export const useFirestore = () => {
         updatedAt: Timestamp.now(),
       });
 
-      toast.success('Project updated successfully');
+      toast.success('Proyecto actualizado correctamente');
       return true;
     } catch (error) {
       console.error('Error updating project:', error);
-      toast.error('Failed to update project');
+      toast.error('Error al actualizar el proyecto');
       return false;
     } finally {
       setLoading(false);
@@ -100,7 +100,7 @@ export const useFirestore = () => {
       return projects;
     } catch (error) {
       console.error('Error fetching projects:', error);
-      toast.error('Failed to load projects');
+      toast.error('Error al cargar los proyectos');
       return [];
     } finally {
       setLoading(false);
@@ -121,10 +121,10 @@ export const useFirestore = () => {
         }
       }
 
-      toast.success('Project deleted');
+      toast.success('Proyecto eliminado');
     } catch (error) {
       console.error('Error deleting project:', error);
-      toast.error('Failed to delete project');
+      toast.error('Error al eliminar el proyecto');
       throw error;
     } finally {
       setLoading(false);
