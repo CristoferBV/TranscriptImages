@@ -19,7 +19,6 @@ const DashboardPage: React.FC = () => {
   const [projects, setProjects] = useState<ProjectData[]>([]);
   const [projectTitle, setProjectTitle] = useState('');
   const [activeTab, setActiveTab] = useState<'new' | 'projects'>('new');
-
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<ProjectData | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -42,29 +41,22 @@ const DashboardPage: React.FC = () => {
   const handleImageCapture = async (file: File) => {
     const imageUrl = await uploadImage(file);
     if (!imageUrl) return;
-
     setCurrentImage(imageUrl);
-
     const result = await processImage(imageUrl);
     if (result) setOcrResult(result);
   };
 
   const handleSaveProject = async (data: OCRResult) => {
     if (!currentImage) return;
-
     const title = projectTitle.trim() || `Proyecto ${new Date().toLocaleDateString()}`;
-
-    const projectData = {
+    const projectId = await saveProject({
       title,
       imageUrl: currentImage,
       fullText: data.fullText,
       materials: data.materials,
       measurements: data.measurements,
       instructions: data.instructions,
-    };
-
-    const projectId = await saveProject(projectData);
-
+    });
     if (projectId) {
       setCurrentImage(null);
       setOcrResult(null);
@@ -81,7 +73,6 @@ const DashboardPage: React.FC = () => {
 
   const confirmDelete = async () => {
     if (!pendingDelete) return;
-
     try {
       setDeleting(true);
       await deleteProject(pendingDelete.id!, pendingDelete.imageUrl);
@@ -96,14 +87,18 @@ const DashboardPage: React.FC = () => {
   const isProcessing = uploading || processing;
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-app-bg">
+      {/* Ambient orbs */}
+      <div className="auth-ambient-orb-1" />
+      <div className="auth-ambient-orb-2" />
+
       {/* Header */}
-      <div className="bg-white shadow-sm border-b border-gray-200">
+      <div className="auth-glass-card border-b border-white/5 sticky top-0 z-30">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-14 sm:h-16">
             <div className="flex items-center">
-              <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center mr-3">
-                <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="w-8 h-8 bg-primary-container rounded-lg flex items-center justify-center mr-3">
+                <svg className="w-5 h-5 text-on-primary-container" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path
                     strokeLinecap="round"
                     strokeLinejoin="round"
@@ -112,24 +107,16 @@ const DashboardPage: React.FC = () => {
                   />
                 </svg>
               </div>
-              <h1 className="text-lg sm:text-xl font-semibold text-gray-900">Digidoc CR</h1>
+              <h1 className="text-lg sm:text-xl font-semibold text-on-surface">Digidoc CR</h1>
             </div>
 
             <div className="flex items-center space-x-2 sm:space-x-4">
-              <div className="flex sm:hidden items-center space-x-1 text-sm text-gray-700">
+              <div className="flex items-center space-x-1 text-sm text-on-surface-variant">
                 <User className="w-4 h-4" />
-                <span className="truncate max-w-[120px]" title={user?.displayName || user?.email || ''}>
+                <span className="truncate max-w-[120px] sm:max-w-32" title={user?.displayName || user?.email || ''}>
                   {user?.displayName || user?.email}
                 </span>
               </div>
-
-              <div className="hidden sm:flex items-center space-x-2 text-sm text-gray-600">
-                <User className="w-4 h-4" />
-                <span className="truncate max-w-32" title={user?.displayName || user?.email || ''}>
-                  {user?.displayName || user?.email}
-                </span>
-              </div>
-
               <Button variant="ghost" size="sm" onClick={logout}>
                 <LogOut className="w-4 h-4 sm:mr-2" />
                 <span className="hidden sm:inline">Cerrar sesión</span>
@@ -140,15 +127,15 @@ const DashboardPage: React.FC = () => {
       </div>
 
       {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8">
+      <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8">
         {/* Tabs */}
-        <div className="flex space-x-1 mb-6 sm:mb-8 bg-gray-100 rounded-lg p-1">
+        <div className="flex space-x-1 mb-6 sm:mb-8 bg-surface-container rounded-lg p-1">
           <button
             onClick={() => setActiveTab('new')}
             className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
               activeTab === 'new'
-                ? 'bg-white text-blue-600 shadow-sm'
-                : 'text-gray-600 hover:text-gray-900'
+                ? 'bg-surface-container-high text-primary shadow-sm'
+                : 'text-on-surface-variant hover:text-on-surface'
             }`}
           >
             <Plus className="w-4 h-4 inline mr-1 sm:mr-2" />
@@ -160,8 +147,8 @@ const DashboardPage: React.FC = () => {
             onClick={() => setActiveTab('projects')}
             className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
               activeTab === 'projects'
-                ? 'bg-white text-blue-600 shadow-sm'
-                : 'text-gray-600 hover:text-gray-900'
+                ? 'bg-surface-container-high text-primary shadow-sm'
+                : 'text-on-surface-variant hover:text-on-surface'
             }`}
           >
             <FolderOpen className="w-4 h-4 inline mr-1 sm:mr-2" />
@@ -170,23 +157,20 @@ const DashboardPage: React.FC = () => {
           </button>
         </div>
 
-        {/* New Project Tab */}
+        {/* Tab: Nuevo proyecto */}
         {activeTab === 'new' && (
           <div className="space-y-6">
             {!currentImage ? (
               <Card className="text-center py-8 sm:py-12">
-                <Camera className="mx-auto h-10 w-10 sm:h-12 sm:w-12 text-gray-400 mb-4" />
-
-                <h3 className="text-lg sm:text-xl font-medium text-gray-900 mb-2">
+                <Camera className="mx-auto h-10 w-10 sm:h-12 sm:w-12 text-on-surface-variant mb-4" />
+                <h3 className="text-lg sm:text-xl font-medium text-on-surface mb-2">
                   Digitalizar documentos
                 </h3>
-
-                <p className="text-sm sm:text-base text-gray-600 mb-6 max-w-md mx-auto px-4">
+                <p className="text-sm sm:text-base text-on-surface-variant mb-6 max-w-md mx-auto px-4">
                   Tome una foto o cargue una imagen, PDF o documento escaneado para
                   extraer, organizar y convertir información en datos digitales listos
                   para procesar y exportar.
                 </p>
-
                 <Button onClick={() => setShowCamera(true)} size="lg" disabled={isProcessing} className="w-full sm:w-auto">
                   <Camera className="w-5 h-5 mr-2" />
                   Iniciar digitalización
@@ -206,14 +190,12 @@ const DashboardPage: React.FC = () => {
                 </Card>
 
                 <Card>
-                  <h3 className="text-base sm:text-lg font-medium text-gray-900 mb-4">
+                  <h3 className="text-base sm:text-lg font-medium text-on-surface mb-4">
                     Documento cargado
                   </h3>
-
-                  <div className="aspect-video bg-gray-100 rounded-lg overflow-hidden mb-4">
+                  <div className="aspect-video bg-surface-container-high rounded-lg overflow-hidden mb-4">
                     <img src={currentImage} alt="Documento cargado" className="w-full h-full object-cover" />
                   </div>
-
                   <div className="flex flex-col sm:flex-row items-center justify-between space-y-3 sm:space-y-0">
                     <Button
                       variant="outline"
@@ -226,9 +208,8 @@ const DashboardPage: React.FC = () => {
                     >
                       Cargar otro documento
                     </Button>
-
                     {isProcessing && (
-                      <div className="flex items-center text-sm text-gray-600 w-full sm:w-auto justify-center">
+                      <div className="flex items-center text-sm text-on-surface-variant w-full sm:w-auto justify-center">
                         <LoadingSpinner size="sm" className="mr-2" />
                         Procesando documento...
                       </div>
@@ -240,21 +221,18 @@ const DashboardPage: React.FC = () => {
           </div>
         )}
 
-        {/* My Projects Tab */}
+        {/* Tab: Mis proyectos */}
         {activeTab === 'projects' && (
           <div>
             {projects.length === 0 ? (
               <Card className="text-center py-8 sm:py-12">
-                <FolderOpen className="mx-auto h-10 w-10 sm:h-12 sm:w-12 text-gray-400 mb-4" />
-
-                <h3 className="text-lg sm:text-xl font-medium text-gray-900 mb-2">
+                <FolderOpen className="mx-auto h-10 w-10 sm:h-12 sm:w-12 text-on-surface-variant mb-4" />
+                <h3 className="text-lg sm:text-xl font-medium text-on-surface mb-2">
                   Aún no hay proyectos
                 </h3>
-
-                <p className="text-sm sm:text-base text-gray-600 mb-6 px-4">
+                <p className="text-sm sm:text-base text-on-surface-variant mb-6 px-4">
                   Comience digitalizando su primer documento.
                 </p>
-
                 <Button onClick={() => setActiveTab('new')} className="w-full sm:w-auto">
                   <Plus className="w-4 h-4 mr-2" />
                   Crear primer proyecto
@@ -275,12 +253,12 @@ const DashboardPage: React.FC = () => {
         )}
       </div>
 
-      {/* Camera Modal */}
+      {/* Modal: Cámara */}
       {showCamera && (
         <CameraCapture onCapture={handleImageCapture} onClose={() => setShowCamera(false)} />
       )}
 
-      {/* OCR Results Modal */}
+      {/* Modal: Resultados OCR */}
       {ocrResult && (
         <OCRResults
           result={ocrResult}
@@ -290,29 +268,26 @@ const DashboardPage: React.FC = () => {
         />
       )}
 
-      {/* Confirmation modal */}
+      {/* Modal: Confirmar eliminación */}
       {confirmOpen && pendingDelete && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4">
-          <div className="w-full max-w-md rounded-xl bg-white shadow-2xl">
+          <div className="w-full max-w-md rounded-xl bg-surface-container border border-outline-variant shadow-2xl">
             <div className="px-5 pt-5">
               <div className="flex items-center gap-3">
-                <div className="rounded-full bg-red-100 p-2 text-red-600">
+                <div className="rounded-full bg-error-container/20 p-2 text-error">
                   <Trash2 className="w-5 h-5" />
                 </div>
-
-                <h3 className="text-lg font-semibold text-gray-900">
+                <h3 className="text-lg font-semibold text-on-surface">
                   ¿Eliminar proyecto?
                 </h3>
               </div>
-
-              <p className="mt-3 px-1 text-sm text-gray-600">
+              <p className="mt-3 px-1 text-sm text-on-surface-variant">
                 Está a punto de eliminar{' '}
-                <span className="font-medium">“{pendingDelete.title}”</span>.
+                <span className="font-medium text-on-surface">"{pendingDelete.title}"</span>.
                 Esta acción no se puede deshacer.
               </p>
             </div>
-
-            <div className="mt-5 flex items-center justify-end gap-3 border-t border-gray-200 px-5 py-4">
+            <div className="mt-5 flex items-center justify-end gap-3 border-t border-outline-variant px-5 py-4">
               <Button
                 variant="outline"
                 className="min-w-[96px]"
@@ -324,9 +299,8 @@ const DashboardPage: React.FC = () => {
               >
                 Cancelar
               </Button>
-
               <Button
-                className="min-w-[96px] bg-red-600 text-white hover:bg-red-700"
+                className="min-w-[96px] bg-error text-on-error hover:opacity-90"
                 onClick={confirmDelete}
                 loading={deleting}
               >

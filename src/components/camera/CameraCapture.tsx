@@ -21,7 +21,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
 
   const [showLoading, setShowLoading] = useState(false);
   const [loadingMessage, setLoadingMessage] =
-    useState<'Scanning...' | 'Uploading image...' | 'Processing image...'>('Scanning...');
+    useState<'Escaneando...' | 'Subiendo imagen...' | 'Procesando imagen...'>('Escaneando...');
 
   const handleClose = useCallback(() => {
     try {
@@ -51,7 +51,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
 
   const handleCapture = async () => {
     setShowLoading(true);
-    setLoadingMessage('Scanning...');
+    setLoadingMessage('Escaneando...');
     const file = await capturePhoto();
     if (!file) {
       setShowLoading(false);
@@ -70,7 +70,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
     if (!file || !file.type.startsWith('image/')) return;
 
     setShowLoading(true);
-    setLoadingMessage('Uploading image...');
+    setLoadingMessage('Subiendo imagen...');
     try {
       await Promise.resolve(onCapture(file));
     } finally {
@@ -85,21 +85,21 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
         <Card className="w-full max-w-md">
           <div className="text-center">
             <Camera className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">Camera Access Required</h3>
+            <h3 className="text-lg font-medium text-gray-900 mb-2">Acceso a cámara requerido</h3>
             <p className="text-sm text-gray-600 mb-6">
-              Please allow camera access to capture images, or upload an existing image instead.
+              Por favor permite el acceso a la cámara para capturar imágenes, o sube una imagen existente.
             </p>
             <div className="space-y-3">
-              <Button onClick={requestCameraPermission} className="w-full">Try Camera Again</Button>
+              <Button onClick={requestCameraPermission} className="w-full">Intentar cámara de nuevo</Button>
               <label className="relative w-full">
                 <input type="file" accept="image/*" onChange={handleFileUpload} className="hidden" />
                 <div className="w-full">
                   <Button variant="outline" className="w-full">
-                    <Upload className="w-4 h-4 mr-2" />Upload Image
+                    <Upload className="w-4 h-4 mr-2" />Subir imagen
                   </Button>
                 </div>
               </label>
-              <Button variant="ghost" onClick={handleClose} className="w-full">Cancel</Button>
+              <Button variant="ghost" onClick={handleClose} className="w-full">Cancelar</Button>
             </div>
           </div>
         </Card>
@@ -123,7 +123,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
               </div>
             </div>
             <p className="text-base font-medium">{loadingMessage}</p>
-            <p className="mt-1 text-xs text-white/70">This may take a moment</p>
+            <p className="mt-1 text-xs text-white/70">Esto puede tomar un momento</p>
             <div className="mt-4 h-1 w-56 overflow-hidden rounded-full bg-white/15">
               <div className="h-full w-1/3 animate-progress bg-white/80" />
             </div>
@@ -136,7 +136,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
         <div className="flex justify-center">
           <p className="flex items-center gap-2 text-white text-sm md:text-base bg-black/60 px-3 md:px-4 py-1.5 rounded-full">
             <Camera className="w-4 h-4" />
-            Position the document within the frame
+            Posicione el documento dentro del marco
           </p>
         </div>
 
@@ -144,8 +144,8 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
         <div className="absolute top-0 right-1">
           <button
             onClick={() => !showLoading && handleClose()}
-            aria-label="Close (Esc)"
-            title="Close (Esc)"
+            aria-label="Cerrar (Esc)"
+            title="Cerrar (Esc)"
             className="mt-1 rounded-full p-2 md:p-2.5 bg-black/55 backdrop-blur ring-1 ring-white/20 text-red-300 hover:text-red-200 hover:bg-black/70 transition shadow-lg focus:outline-none focus:ring-2 focus:ring-red-400"
           >
             <X className="w-5 h-5" />
@@ -214,7 +214,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
           >
             <label className="px-7 py-3.5 bg-yellow-500/80 text-white rounded-lg shadow-md border border-transparent hover:bg-yellow-500/60 hover:border-yellow-400 transition-all cursor-pointer flex items-center">
               <Upload className="w-5 h-5 mr-2" />
-              Upload
+              Subir
               <input type="file" accept="image/*" onChange={handleFileUpload} className="hidden" />
             </label>
 
@@ -225,7 +225,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
               className="px-8 py-3 bg-blue-600/80 text-white rounded-lg shadow-md border border-transparent hover:bg-blue-600/60 hover:border-blue-400 transition-all"
             >
               <Camera className="w-5 h-5 mr-2" />
-              Capture
+              Capturar
             </Button>
           </div>
         </div>

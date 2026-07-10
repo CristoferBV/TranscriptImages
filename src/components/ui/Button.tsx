@@ -17,13 +17,13 @@ const Button: React.FC<ButtonProps> = ({
   className = '',
   ...props
 }) => {
-  const baseClasses = 'inline-flex items-center justify-center rounded-lg font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed';
+  const baseClasses = 'inline-flex items-center justify-center rounded-lg font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-app-bg disabled:opacity-50 disabled:cursor-not-allowed';
   
   const variantClasses = {
-    primary: 'bg-blue-600 text-white hover:bg-blue-700 active:bg-blue-800',
-    secondary: 'bg-orange-600 text-white hover:bg-orange-700 active:bg-orange-800',
-    outline: 'border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 active:bg-gray-100',
-    ghost: 'text-gray-600 hover:bg-gray-100 active:bg-gray-200',
+    primary: 'bg-primary-container text-on-primary-container hover:bg-primary-fixed-dim hover:text-on-primary-fixed active:opacity-90',
+    secondary: 'bg-secondary-container text-on-secondary-container hover:opacity-90 active:opacity-80',
+    outline: 'border border-outline-variant bg-transparent text-on-surface hover:bg-surface-container-high active:bg-surface-container-highest',
+    ghost: 'text-on-surface-variant hover:bg-surface-container-high active:bg-surface-container-highest',
   };
   
   const sizeClasses = {
