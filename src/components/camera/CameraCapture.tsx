@@ -1,8 +1,10 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { Camera, Upload, X } from 'lucide-react';
+import toast from 'react-hot-toast';
 import Button from '../ui/Button';
 import Card from '../ui/Card';
 import { useCamera } from '../../hooks/useCamera';
+import { useIsMobile } from '../../hooks/useIsMobile';
 
 interface CameraCaptureProps {
   onCapture: (file: File) => Promise<void> | void;
@@ -19,6 +21,19 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
     stopCamera,
   } = useCamera();
 
+  const isMobile = useIsMobile();
+  const toastShownRef = useRef(false);
+
+  const showCameraError = useCallback((reason: string) => {
+    if (toastShownRef.current) return;
+    toastShownRef.current = true;
+    if (reason === 'denied') {
+      toast.error('Permiso de cámara denegado. Habilítalo en la configuración del navegador.');
+    } else if (reason === 'unavailable') {
+      toast.error('La cámara no está disponible o está siendo usada por otra app.');
+    }
+  }, []);
+
   const [showLoading, setShowLoading] = useState(false);
   const [loadingMessage, setLoadingMessage] =
     useState<'Escaneando...' | 'Subiendo imagen...' | 'Procesando imagen...'>('Escaneando...');
@@ -32,11 +47,13 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
   }, [stopCamera, onClose]);
 
   useEffect(() => {
-    requestCameraPermission();
-    return () => {
-      stopCamera();
-    };
-  }, []);
+    if (!isMobile) return;
+    toastShownRef.current = false;
+    requestCameraPermission().then((result) => {
+      if (typeof result === 'string') showCameraError(result);
+    });
+    return () => { stopCamera(); };
+  }, [isMobile]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -68,7 +85,6 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !file.type.startsWith('image/')) return;
-
     setShowLoading(true);
     setLoadingMessage('Subiendo imagen...');
     try {
@@ -79,18 +95,62 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
     }
   };
 
+  // ── Desktop: solo mostrar uploader, sin cámara ──────────────────────────
+  if (!isMobile) {
+    return (
+      <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50">
+        <Card className="w-full max-w-xl">
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-lg font-semibold text-on-surface">Cargar documento</h3>
+            <button
+              onClick={handleClose}
+              aria-label="Cerrar"
+              className="p-2 hover:bg-surface-container-high rounded-full transition-colors text-on-surface-variant hover:text-on-surface"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+
+          {showLoading ? (
+            <div className="flex flex-col items-center py-8 gap-3 text-on-surface-variant">
+              <div className="w-10 h-10 rounded-full border-2 border-primary border-t-transparent animate-spin-slow" />
+              <p className="text-sm">{loadingMessage}</p>
+            </div>
+          ) : (
+            <label className="flex flex-col items-center justify-center w-full h-56 border-2 border-dashed border-outline-variant rounded-xl cursor-pointer hover:border-primary hover:bg-primary/5 transition-colors group">
+              <Upload className="w-8 h-8 text-on-surface-variant group-hover:text-primary mb-3 transition-colors" />
+              <span className="text-sm font-medium text-on-surface">Haz clic para seleccionar una imagen</span>
+              <span className="text-xs text-on-surface-variant mt-1">PNG, JPG, WEBP</span>
+              <input type="file" accept="image/*" onChange={handleFileUpload} className="hidden" />
+            </label>
+          )}
+
+          <Button variant="ghost" onClick={handleClose} className="w-full mt-4">
+            Cancelar
+          </Button>
+        </Card>
+      </div>
+    );
+  }
+
+  // ── Móvil: pantalla completa con cámara ─────────────────────────────────
   if (hasPermission === false) {
     return (
       <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
         <Card className="w-full max-w-md">
           <div className="text-center">
-            <Camera className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">Acceso a cámara requerido</h3>
-            <p className="text-sm text-gray-600 mb-6">
+            <Camera className="mx-auto h-12 w-12 text-on-surface-variant mb-4" />
+            <h3 className="text-lg font-medium text-on-surface mb-2">Acceso a cámara requerido</h3>
+            <p className="text-sm text-on-surface-variant mb-6">
               Por favor permite el acceso a la cámara para capturar imágenes, o sube una imagen existente.
             </p>
             <div className="space-y-3">
-              <Button onClick={requestCameraPermission} className="w-full">Intentar cámara de nuevo</Button>
+              <Button onClick={() => {
+                toastShownRef.current = false;
+                requestCameraPermission().then((result) => {
+                  if (typeof result === 'string') showCameraError(result);
+                });
+              }} className="w-full">Intentar cámara de nuevo</Button>
               <label className="relative w-full">
                 <input type="file" accept="image/*" onChange={handleFileUpload} className="hidden" />
                 <div className="w-full">
@@ -139,8 +199,6 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
             Posicione el documento dentro del marco
           </p>
         </div>
-
-        {/* Close button mejorado */}
         <div className="absolute top-0 right-1">
           <button
             onClick={() => !showLoading && handleClose()}
@@ -157,7 +215,6 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
       <div className="flex-1 relative">
         <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
 
-        {/* Centered frame with space */}
         <div className="absolute inset-0 flex items-center justify-center z-30 pt-16 md:pt-20 pb-28 md:pb-40">
           <div
             className="
@@ -204,7 +261,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
         </div>
       </div>
 
-      {/* Background buttons */}
+      {/* Botones móvil */}
       <div className="pointer-events-none absolute inset-x-0 bottom-0 z-40">
         <div className="bg-gradient-to-t from-black/85 to-transparent pt-6 pb-4">
           <div

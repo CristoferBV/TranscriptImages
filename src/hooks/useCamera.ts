@@ -1,5 +1,4 @@
 import { useState, useRef } from 'react';
-import toast from 'react-hot-toast';
 
 export const useCamera = () => {
   const [isCapturing, setIsCapturing] = useState(false);
@@ -8,27 +7,44 @@ export const useCamera = () => {
   const streamRef = useRef<MediaStream | null>(null);
 
   const requestCameraPermission = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        video: { 
-          facingMode: 'environment',
-          width: { ideal: 1920 },
-          height: { ideal: 1080 }
-        } 
-      });
-      
-      streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-      }
-      setHasPermission(true);
-      return stream;
-    } catch (error) {
-      console.error('Camera permission denied:', error);
-      setHasPermission(false);
-      toast.error('Se requiere acceso a la cámara para capturar imágenes');
-      return null;
+    // Detener stream previo antes de pedir uno nuevo
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(t => t.stop());
+      streamRef.current = null;
     }
+
+    const constraints: MediaStreamConstraints[] = [
+      { video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } } },
+      { video: { facingMode: 'environment' } },
+      { video: true },
+    ];
+
+    for (const constraint of constraints) {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia(constraint);
+        streamRef.current = stream;
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+        }
+        setHasPermission(true);
+        return stream;
+      } catch (error: any) {
+        const name = error?.name ?? '';
+        // Si es denegación de permisos o abort, no seguir intentando
+        if (name === 'NotAllowedError' || name === 'PermissionDeniedError') {
+          setHasPermission(false);
+          return 'denied';
+        }
+        if (name === 'AbortError') {
+          setHasPermission(false);
+          return 'aborted';
+        }
+        console.warn('Camera constraint failed, trying next:', name);
+      }
+    }
+
+    setHasPermission(false);
+    return 'unavailable';
   };
 
   const capturePhoto = async (): Promise<File | null> => {
@@ -75,8 +91,8 @@ export const useCamera = () => {
   };
 
   const stopCamera = () => {
-    const stream = videoRef.current?.srcObject as MediaStream | null;
-    stream?.getTracks().forEach(t => t.stop());
+    streamRef.current?.getTracks().forEach(t => t.stop());
+    streamRef.current = null;
     if (videoRef.current) {
       videoRef.current.srcObject = null;
     }
