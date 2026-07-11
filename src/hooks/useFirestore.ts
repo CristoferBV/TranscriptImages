@@ -9,12 +9,11 @@ import {
   where,
   orderBy,
   Timestamp,
-  deleteDoc,      
+  deleteDoc,
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { useAuthState } from './useAuth';
 import toast from 'react-hot-toast';
-
 import { getStorage, deleteObject, ref } from 'firebase/storage';
 
 export interface ProjectData {
@@ -23,9 +22,6 @@ export interface ProjectData {
   title: string;
   imageUrl: string;
   fullText: string;
-  materials: string[];
-  measurements: string[];
-  instructions: string[];
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }
@@ -33,13 +29,12 @@ export interface ProjectData {
 export const useFirestore = () => {
   const [loading, setLoading] = useState(false);
   const { user } = useAuthState();
-  const storage = getStorage(); 
+  const storage = getStorage();
 
   const saveProject = async (
     projectData: Omit<ProjectData, 'id' | 'userId' | 'createdAt' | 'updatedAt'>
   ): Promise<string | null> => {
     if (!user) return null;
-
     setLoading(true);
     try {
       const docRef = await addDoc(collection(db, 'projects'), {
@@ -48,7 +43,6 @@ export const useFirestore = () => {
         createdAt: Timestamp.now(),
         updatedAt: Timestamp.now(),
       });
-
       toast.success('Proyecto guardado correctamente');
       return docRef.id;
     } catch (error) {
@@ -64,11 +58,7 @@ export const useFirestore = () => {
     setLoading(true);
     try {
       const docRef = doc(db, 'projects', projectId);
-      await updateDoc(docRef, {
-        ...updates,
-        updatedAt: Timestamp.now(),
-      });
-
+      await updateDoc(docRef, { ...updates, updatedAt: Timestamp.now() });
       toast.success('Proyecto actualizado correctamente');
       return true;
     } catch (error) {
@@ -82,7 +72,6 @@ export const useFirestore = () => {
 
   const getUserProjects = async (): Promise<ProjectData[]> => {
     if (!user) return [];
-
     setLoading(true);
     try {
       const q = query(
@@ -90,14 +79,8 @@ export const useFirestore = () => {
         where('userId', '==', user.uid),
         orderBy('updatedAt', 'desc')
       );
-
-      const querySnapshot = await getDocs(q);
-      const projects = querySnapshot.docs.map(d => ({
-        id: d.id,
-        ...d.data(),
-      })) as ProjectData[];
-
-      return projects;
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(d => ({ id: d.id, ...d.data() })) as ProjectData[];
     } catch (error) {
       console.error('Error fetching projects:', error);
       toast.error('Error al cargar los proyectos');
@@ -111,16 +94,13 @@ export const useFirestore = () => {
     setLoading(true);
     try {
       await deleteDoc(doc(db, 'projects', projectId));
-
       if (imageUrl) {
         try {
-          const fileRef = ref(storage, imageUrl);
-          await deleteObject(fileRef);
+          await deleteObject(ref(storage, imageUrl));
         } catch (err) {
           console.warn('Could not delete image from Storage:', err);
         }
       }
-
       toast.success('Proyecto eliminado');
     } catch (error) {
       console.error('Error deleting project:', error);
