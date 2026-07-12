@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { ScanText, LogOut, User, Trash2, Menu, X } from 'lucide-react';
+import { ScanText, LogOut, User, Trash2, Menu, X, BarChart2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import Button from '../components/ui/Button';
 import SkeletonCard from '../components/ui/SkeletonCard';
@@ -123,6 +123,13 @@ const DashboardPage: React.FC = () => {
               <User className="w-4 h-4" />
               <span className="truncate">{user?.displayName || user?.email}</span>
             </div>
+            <button
+              onClick={() => { setMobileMenuOpen(false); navigate('/stats'); }}
+              className="flex items-center gap-2 text-sm text-on-surface-variant hover:text-on-surface transition-colors"
+            >
+              <BarChart2 className="w-4 h-4" />
+              Estadísticas
+            </button>
             <button
               onClick={() => { setMobileMenuOpen(false); setConfirmLogout(true); }}
               className="flex items-center gap-2 text-sm text-on-surface-variant hover:text-error transition-colors"

@@ -27,10 +27,22 @@ const avgWordsPerPage = (projects: ProjectData[]) => {
   return pages === 0 ? 0 : Math.round(totalWords(projects) / pages);
 };
 
+const totalChars = (projects: ProjectData[]) =>
+  projects.reduce((s, p) =>
+    s + p.pages.reduce((ps, pg) => ps + pg.fullText.trim().length, 0), 0);
+
+const avgCharsPerPage = (projects: ProjectData[]) => {
+  const pages = totalPages(projects);
+  return pages === 0 ? 0 : Math.round(totalChars(projects) / pages);
+};
+
+const lowQualityPages = (projects: ProjectData[]) =>
+  projects.reduce((s, p) => s + p.pages.filter(pg => pg.fullText.trim().length < 20).length, 0);
+
 const ocrSuccessRate = (projects: ProjectData[]) => {
   const pages = totalPages(projects);
   if (pages === 0) return 100;
-  return Math.round(((pages - failedPages(projects)) / pages) * 100);
+  return Math.round(((pages - lowQualityPages(projects)) / pages) * 100);
 };
 
 const docsByMonth = (projects: ProjectData[]) => {
@@ -104,8 +116,9 @@ const StatsPage: React.FC = () => {
   const monthData = docsByMonth(projects);
   const top = topDocument(projects);
   const successRate = ocrSuccessRate(projects);
-  const failed = failedPages(projects);
+  const failed = lowQualityPages(projects);
   const pages = totalPages(projects);
+  const avgChars = avgCharsPerPage(projects);
 
   return (
     <div className="min-h-screen bg-app-bg flex">
@@ -160,13 +173,13 @@ const StatsPage: React.FC = () => {
                   icon={<AlignLeft className="w-4 h-4 text-on-surface-variant" />}
                   label="Palabras extraídas"
                   value={totalWords(projects).toLocaleString('es-CR')}
-                  sub={`~${avgWordsPerPage(projects)} palabras/página`}
+                  sub={`~${avgWordsPerPage(projects)} palabras · ~${avgChars} chars/pág`}
                 />
                 <StatCard
                   icon={<TrendingUp className="w-4 h-4 text-on-surface-variant" />}
-                  label="Tasa de éxito OCR"
+                  label="Calidad OCR"
                   value={`${successRate}%`}
-                  sub={failed > 0 ? `${failed} página(s) sin texto` : 'Sin fallos detectados'}
+                  sub={failed > 0 ? `${failed} pág. con menos de 20 caracteres` : 'Todas las páginas con buen texto'}
                 />
               </div>
 
@@ -182,7 +195,7 @@ const StatsPage: React.FC = () => {
                   <div className="space-y-3">
                     <div>
                       <div className="flex justify-between text-xs text-on-surface-variant mb-1">
-                        <span>Páginas con texto</span>
+                        <span>Páginas con buen texto (&gt;20 chars)</span>
                         <span>{pages - failed} / {pages}</span>
                       </div>
                       <div className="h-2 bg-surface-container-high rounded-full overflow-hidden">
@@ -199,7 +212,7 @@ const StatsPage: React.FC = () => {
                       </div>
                       <div className="flex items-center gap-1.5 text-xs text-on-surface-variant">
                         <XCircle className="w-3.5 h-3.5 text-error" />
-                        <span>{failed} sin texto</span>
+                        <span>{failed} baja calidad</span>
                       </div>
                     </div>
                   </div>
