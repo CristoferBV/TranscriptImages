@@ -1,68 +1,78 @@
-import React, { useState, useEffect } from 'react';
-import { Camera, Plus, LogOut, User, FolderOpen, Trash2 } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { ScanText, LogOut, User, Trash2, Menu, X } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import Button from '../components/ui/Button';
-import Card from '../components/ui/Card';
-import LoadingSpinner from '../components/ui/LoadingSpinner';
+import SkeletonCard from '../components/ui/SkeletonCard';
+import EmptyState from '../components/ui/EmptyState';
+import FAB from '../components/ui/FAB';
+import SearchBar from '../components/ui/SearchBar';
+import Sidebar from '../components/ui/Sidebar';
+import ConfirmDialog from '../components/ui/ConfirmDialog';
 import CameraCapture from '../components/camera/CameraCapture';
 import OCRResults from '../components/ocr/OCRResults';
 import ProjectCard from '../components/projects/ProjectCard';
 import { useAuthState, useAuthActions } from '../hooks/useAuth';
 import { useImageUpload } from '../hooks/useImageUpload';
-import { useOCR, OCRResult } from '../hooks/useOCR';
-import { useFirestore, ProjectData } from '../hooks/useFirestore';
+import { useOCR } from '../hooks/useOCR';
+import { useFirestore, ProjectData, ProjectPage } from '../hooks/useFirestore';
 
 const DashboardPage: React.FC = () => {
   const [showCamera, setShowCamera] = useState(false);
-  const [currentImage, setCurrentImage] = useState<string | null>(null);
-  const [ocrResult, setOcrResult] = useState<OCRResult | null>(null);
+  const [ocrPages, setOcrPages] = useState<ProjectPage[] | null>(null);
   const [projectTitle, setProjectTitle] = useState('');
   const [projects, setProjects] = useState<ProjectData[]>([]);
-  const [activeTab, setActiveTab] = useState<'new' | 'projects'>('new');
+  const [loadingProjects, setLoadingProjects] = useState(true);
+  const [search, setSearch] = useState('');
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<ProjectData | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [confirmLogout, setConfirmLogout] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const { user } = useAuthState();
   const { logout } = useAuthActions();
-  const { uploadImage, uploading } = useImageUpload();
-  const { processImage, processing } = useOCR();
+  const { uploadImages, uploading } = useImageUpload();
+  const { processImages, processing, progress } = useOCR();
   const { saveProject, getUserProjects, deleteProject, loading: firestoreLoading } = useFirestore();
+  const navigate = useNavigate();
 
-  useEffect(() => {
-    loadProjects();
-  }, []);
+  useEffect(() => { loadProjects(); }, []);
 
   const loadProjects = async () => {
+    setLoadingProjects(true);
     const userProjects = await getUserProjects();
     setProjects(userProjects);
+    setLoadingProjects(false);
   };
 
-  const handleImageCapture = async (file: File) => {
-    const imageUrl = await uploadImage(file);
-    if (!imageUrl) return;
-    setCurrentImage(imageUrl);
-    const result = await processImage(imageUrl);
-    if (result) setOcrResult(result);
+  const filteredProjects = useMemo(() => {
+    if (!search.trim()) return projects;
+    const q = search.toLowerCase();
+    return projects.filter(p =>
+      p.title.toLowerCase().includes(q) ||
+      p.pages.some(pg => pg.fullText.toLowerCase().includes(q))
+    );
+  }, [projects, search]);
+
+  const handleCapture = async (files: File[]) => {
+    const urls = await uploadImages(files);
+    if (!urls.length) return;
+    const pages = await processImages(urls);
+    if (pages.length) setOcrPages(pages);
   };
 
-  const handleSaveProject = async (data: OCRResult) => {
-    if (!currentImage) return;
+  const handleSaveProject = async (pages: ProjectPage[]) => {
     const title = projectTitle.trim() || `Escaneo ${new Date().toLocaleDateString('es-CR')}`;
-    const projectId = await saveProject({
-      title,
-      imageUrl: currentImage,
-      fullText: data.fullText,
-    });
+    const projectId = await saveProject({ title, pages });
     if (projectId) {
-      setCurrentImage(null);
-      setOcrResult(null);
+      setOcrPages(null);
       setProjectTitle('');
       await loadProjects();
-      setActiveTab('projects');
+      navigate(`/document/${projectId}`);
     }
   };
 
-  const requestDeleteProject = (project: ProjectData) => {
+  const requestDelete = (project: ProjectData) => {
     setPendingDelete(project);
     setConfirmOpen(true);
   };
@@ -71,7 +81,7 @@ const DashboardPage: React.FC = () => {
     if (!pendingDelete) return;
     try {
       setDeleting(true);
-      await deleteProject(pendingDelete.id!, pendingDelete.imageUrl);
+      await deleteProject(pendingDelete.id!, pendingDelete.pages);
       await loadProjects();
     } finally {
       setDeleting(false);
@@ -83,194 +93,150 @@ const DashboardPage: React.FC = () => {
   const isProcessing = uploading || processing;
 
   return (
-    <div className="min-h-screen bg-app-bg">
+    <div className="min-h-screen bg-app-bg flex">
       <div className="auth-ambient-orb-1" />
       <div className="auth-ambient-orb-2" />
 
-      {/* Header */}
-      <div className="auth-glass-card border-b border-white/5 sticky top-0 z-30">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-14 sm:h-16">
-            <div className="flex items-center">
-              <div className="w-8 h-8 bg-primary-container rounded-lg flex items-center justify-center mr-3">
-                <svg className="w-5 h-5 text-on-primary-container" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                </svg>
-              </div>
-              <h1 className="text-lg sm:text-xl font-semibold text-on-surface">Digidoc CR</h1>
+      <Sidebar documentCount={projects.length} onNewScan={() => setShowCamera(true)} />
+
+      <div className="flex-1 flex flex-col min-w-0">
+
+        {/* Top bar móvil */}
+        <header className="lg:hidden auth-glass-card border-b border-white/5 sticky top-0 z-30 px-4 h-14 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-lg bg-primary/15 border border-primary/20 flex items-center justify-center">
+              <ScanText className="w-4 h-4 text-primary" strokeWidth={1.75} />
             </div>
-            <div className="flex items-center space-x-2 sm:space-x-4">
-              <div className="flex items-center space-x-1 text-sm text-on-surface-variant">
-                <User className="w-4 h-4" />
-                <span className="truncate max-w-[120px] sm:max-w-32" title={user?.displayName || user?.email || ''}>
-                  {user?.displayName || user?.email}
-                </span>
-              </div>
-              <Button variant="ghost" size="sm" onClick={logout}>
-                <LogOut className="w-4 h-4 sm:mr-2" />
-                <span className="hidden sm:inline">Cerrar sesión</span>
-              </Button>
-            </div>
+            <span className="text-sm font-semibold text-on-surface">Digidoc CR</span>
           </div>
-        </div>
-      </div>
-
-      {/* Main */}
-      <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8">
-
-        {/* Tabs */}
-        <div className="flex space-x-1 mb-6 sm:mb-8 bg-surface-container rounded-lg p-1">
           <button
-            onClick={() => setActiveTab('new')}
-            className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
-              activeTab === 'new'
-                ? 'bg-surface-container-high text-primary shadow-sm'
-                : 'text-on-surface-variant hover:text-on-surface'
-            }`}
+            onClick={() => setMobileMenuOpen(v => !v)}
+            className="p-2 rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-colors"
           >
-            <Plus className="w-4 h-4 inline mr-1 sm:mr-2" />
-            <span className="hidden xs:inline">Nuevo escaneo</span>
-            <span className="xs:hidden">Nuevo</span>
+            {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
           </button>
-          <button
-            onClick={() => setActiveTab('projects')}
-            className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
-              activeTab === 'projects'
-                ? 'bg-surface-container-high text-primary shadow-sm'
-                : 'text-on-surface-variant hover:text-on-surface'
-            }`}
-          >
-            <FolderOpen className="w-4 h-4 inline mr-1 sm:mr-2" />
-            <span className="hidden xs:inline">Mis documentos ({projects.length})</span>
-            <span className="xs:hidden">Documentos ({projects.length})</span>
-          </button>
-        </div>
+        </header>
 
-        {/* Tab: Nuevo escaneo */}
-        {activeTab === 'new' && (
-          <div className="space-y-6">
-            {!currentImage ? (
-              <Card className="text-center py-12 sm:py-16">
-                <Camera className="mx-auto h-12 w-12 text-on-surface-variant mb-4" />
-                <h3 className="text-lg sm:text-xl font-medium text-on-surface mb-2">
-                  Escanear documento
-                </h3>
-                <p className="text-sm sm:text-base text-on-surface-variant mb-8 max-w-sm mx-auto px-4">
-                  Toma una foto o sube una imagen para extraer y digitalizar el texto que contiene.
-                </p>
-                <Button onClick={() => setShowCamera(true)} size="lg" disabled={isProcessing} className="w-full sm:w-auto">
-                  <Camera className="w-5 h-5 mr-2" />
-                  Iniciar escaneo
-                </Button>
-              </Card>
-            ) : (
-              <Card>
-                <h3 className="text-base font-medium text-on-surface mb-4">Imagen cargada</h3>
-                <div className="aspect-video bg-surface-container-high rounded-xl overflow-hidden mb-4">
-                  <img src={currentImage} alt="Documento cargado" className="w-full h-full object-cover" />
-                </div>
-                <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
-                  <Button
-                    variant="outline"
-                    onClick={() => { setCurrentImage(null); setOcrResult(null); setProjectTitle(''); }}
-                    className="w-full sm:w-auto"
-                  >
-                    Cargar otra imagen
-                  </Button>
-                  {isProcessing && (
-                    <div className="flex items-center text-sm text-on-surface-variant">
-                      <LoadingSpinner size="sm" className="mr-2" />
-                      Extrayendo texto...
-                    </div>
-                  )}
-                </div>
-              </Card>
-            )}
+        {mobileMenuOpen && (
+          <div className="lg:hidden auth-glass-card border-b border-white/5 px-4 py-3 z-20 space-y-2">
+            <div className="flex items-center gap-2 text-sm text-on-surface-variant">
+              <User className="w-4 h-4" />
+              <span className="truncate">{user?.displayName || user?.email}</span>
+            </div>
+            <button
+              onClick={() => { setMobileMenuOpen(false); setConfirmLogout(true); }}
+              className="flex items-center gap-2 text-sm text-on-surface-variant hover:text-error transition-colors"
+            >
+              <LogOut className="w-4 h-4" />
+              Cerrar sesión
+            </button>
           </div>
         )}
 
-        {/* Tab: Mis documentos */}
-        {activeTab === 'projects' && (
-          <div>
-            {projects.length === 0 ? (
-              <Card className="text-center py-12 sm:py-16">
-                <FolderOpen className="mx-auto h-12 w-12 text-on-surface-variant mb-4" />
-                <h3 className="text-lg sm:text-xl font-medium text-on-surface mb-2">
-                  Aún no hay documentos
-                </h3>
-                <p className="text-sm text-on-surface-variant mb-6 px-4">
-                  Comienza escaneando tu primer documento.
-                </p>
-                <Button onClick={() => setActiveTab('new')} className="w-full sm:w-auto">
-                  <Plus className="w-4 h-4 mr-2" />
-                  Escanear documento
-                </Button>
-              </Card>
-            ) : (
-              <div className="grid gap-4 sm:gap-6 sm:grid-cols-2 lg:grid-cols-3">
-                {projects.map((project) => (
-                  <ProjectCard key={project.id} project={project} onDelete={requestDeleteProject} />
-                ))}
-              </div>
-            )}
+        <main className="flex-1 relative z-10 px-4 sm:px-6 lg:px-8 py-6 lg:py-8">
+
+          {/* Page header */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 lg:mb-8">
+            <div>
+              <h1 className="text-xl lg:text-2xl font-semibold text-on-surface">Mis documentos</h1>
+              <p className="text-sm text-on-surface-variant mt-0.5">
+                {projects.length} {projects.length === 1 ? 'documento' : 'documentos'} escaneados
+              </p>
+            </div>
+            <button
+              onClick={() => setShowCamera(true)}
+              className="hidden sm:flex btn-auth-primary items-center gap-2 px-5 py-2.5 rounded-full text-sm font-semibold"
+            >
+              <ScanText className="w-4 h-4" strokeWidth={2} />
+              Nuevo escaneo
+            </button>
           </div>
-        )}
+
+          {/* Barra de progreso OCR */}
+          {isProcessing && progress && (
+            <div className="mb-6 bg-surface-container border border-outline-variant rounded-xl px-4 py-3 flex items-center gap-3">
+              <div className="w-5 h-5 rounded-full border-2 border-primary border-t-transparent animate-spin-slow shrink-0" />
+              <div className="flex-1">
+                <p className="text-sm text-on-surface font-medium">
+                  Procesando imágenes... {progress.done}/{progress.total}
+                </p>
+                <div className="mt-1.5 h-1.5 bg-surface-container-high rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-primary rounded-full transition-all duration-300"
+                    style={{ width: `${(progress.done / progress.total) * 100}%` }}
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Search */}
+          {projects.length > 0 && (
+            <div className="mb-6">
+              <SearchBar value={search} onChange={setSearch} />
+            </div>
+          )}
+
+          {/* Grid */}
+          {loadingProjects ? (
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {Array.from({ length: 6 }).map((_, i) => <SkeletonCard key={i} />)}
+            </div>
+          ) : projects.length === 0 ? (
+            <EmptyState onScan={() => setShowCamera(true)} />
+          ) : filteredProjects.length === 0 ? (
+            <div className="text-center py-16">
+              <p className="text-on-surface-variant text-sm">No se encontraron documentos para "{search}"</p>
+              <button onClick={() => setSearch('')} className="text-primary text-sm mt-2 hover:underline">
+                Limpiar búsqueda
+              </button>
+            </div>
+          ) : (
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {filteredProjects.map((project) => (
+                <ProjectCard key={project.id} project={project} onDelete={requestDelete} />
+              ))}
+            </div>
+          )}
+        </main>
       </div>
 
-      {/* Modal: Cámara */}
+      <FAB onClick={() => setShowCamera(true)} />
+
       {showCamera && (
-        <CameraCapture onCapture={handleImageCapture} onClose={() => setShowCamera(false)} />
+        <CameraCapture onCapture={handleCapture} onClose={() => setShowCamera(false)} />
       )}
 
-      {/* Modal: Resultado OCR */}
-      {ocrResult && (
+      {ocrPages && (
         <OCRResults
-          result={ocrResult}
+          pages={ocrPages}
           projectTitle={projectTitle}
           onTitleChange={setProjectTitle}
           onSave={handleSaveProject}
-          onClose={() => { setOcrResult(null); setCurrentImage(null); setProjectTitle(''); }}
+          onClose={() => { setOcrPages(null); setProjectTitle(''); }}
           saving={firestoreLoading}
         />
       )}
 
-      {/* Modal: Confirmar eliminación */}
-      {confirmOpen && pendingDelete && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4">
-          <div className="w-full max-w-md rounded-xl bg-surface-container border border-outline-variant shadow-2xl">
-            <div className="px-5 pt-5">
-              <div className="flex items-center gap-3">
-                <div className="rounded-full bg-error-container/20 p-2 text-error">
-                  <Trash2 className="w-5 h-5" />
-                </div>
-                <h3 className="text-lg font-semibold text-on-surface">¿Eliminar documento?</h3>
-              </div>
-              <p className="mt-3 px-1 text-sm text-on-surface-variant">
-                Está a punto de eliminar{' '}
-                <span className="font-medium text-on-surface">"{pendingDelete.title}"</span>.
-                Esta acción no se puede deshacer.
-              </p>
-            </div>
-            <div className="mt-5 flex items-center justify-end gap-3 border-t border-outline-variant px-5 py-4">
-              <Button
-                variant="outline"
-                className="min-w-[96px]"
-                onClick={() => { setConfirmOpen(false); setPendingDelete(null); }}
-                disabled={deleting}
-              >
-                Cancelar
-              </Button>
-              <Button
-                className="min-w-[96px] bg-error text-on-error hover:opacity-90"
-                onClick={confirmDelete}
-                loading={deleting}
-              >
-                Eliminar
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmDialog
+        open={confirmOpen && !!pendingDelete}
+        variant="danger"
+        title="¿Eliminar documento?"
+        description={`Está a punto de eliminar "${pendingDelete?.title}". Esta acción no se puede deshacer.`}
+        confirmLabel="Eliminar"
+        loading={deleting}
+        onConfirm={confirmDelete}
+        onCancel={() => { setConfirmOpen(false); setPendingDelete(null); }}
+      />
+      <ConfirmDialog
+        open={confirmLogout}
+        variant="logout"
+        title="¿Cerrar sesión?"
+        description="Se cerrará tu sesión actual. Podrás volver a iniciar sesión cuando quieras."
+        confirmLabel="Cerrar sesión"
+        onConfirm={() => { setConfirmLogout(false); logout(); }}
+        onCancel={() => setConfirmLogout(false)}
+      />
     </div>
   );
 };

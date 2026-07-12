@@ -6,11 +6,28 @@ import type { File } from "@google-cloud/storage";
 import PDFDocument = require("pdfkit");
 import { Workbook } from "exceljs";
 import { ImageAnnotatorClient } from "@google-cloud/vision";
+import * as https from "https";
+import * as http from "http";
 
 admin.initializeApp();
 setGlobalOptions({ region: "us-central1", maxInstances: 10 });
 
-const visionClient = new ImageAnnotatorClient();
+let visionClient: ImageAnnotatorClient | null = null;
+const getVisionClient = () => {
+  if (!visionClient) visionClient = new ImageAnnotatorClient();
+  return visionClient;
+};
+
+interface ProjectPage {
+  imageUrl: string;
+  fullText: string;
+}
+
+interface Project {
+  id?: string;
+  title?: string;
+  pages: ProjectPage[];
+}
 
 function buildFileName(title: string | undefined, ext: "pdf" | "xlsx") {
   const base = (title || "Documento")
@@ -41,6 +58,18 @@ function normalize(text: string) {
     .trim();
 }
 
+function fetchImageBuffer(url: string): Promise<Buffer> {
+  return new Promise((resolve, reject) => {
+    const client = url.startsWith("https") ? https : http;
+    client.get(url, (res) => {
+      const chunks: Buffer[] = [];
+      res.on("data", (chunk) => chunks.push(chunk));
+      res.on("end", () => resolve(Buffer.concat(chunks)));
+      res.on("error", reject);
+    }).on("error", reject);
+  });
+}
+
 /* =========================
    OCR
 ========================= */
@@ -49,7 +78,7 @@ export const processOCR = onCall(async (request) => {
     const { imageUrl } = request.data;
     if (!imageUrl) throw new HttpsError("invalid-argument", "Missing imageUrl");
 
-    const [resp] = await visionClient.documentTextDetection({
+    const [resp] = await getVisionClient().documentTextDetection({
       image: { source: { imageUri: imageUrl } },
     });
 
@@ -69,12 +98,15 @@ export const processOCR = onCall(async (request) => {
 });
 
 /* =========================
-   PDF
+   PDF — una página por imagen
 ========================= */
 export const generatePDF = onCall(async (req) => {
   try {
-    const project = req.data?.project;
+    const project: Project = req.data?.project;
     if (!project) throw new HttpsError("invalid-argument", "Missing project");
+
+    const pages: ProjectPage[] = project.pages || [];
+    if (!pages.length) throw new HttpsError("invalid-argument", "Project has no pages");
 
     const bucket = admin.storage().bucket();
     const objectPath = `exports/${project.id || Date.now()}-${Date.now()}.pdf`;
@@ -89,14 +121,50 @@ export const generatePDF = onCall(async (req) => {
       },
     });
 
-    const doc = new PDFDocument({ size: "A4", margin: 50 });
+    const doc = new PDFDocument({ size: "A4", margin: 50, autoFirstPage: false });
     doc.pipe(stream);
 
-    doc.fontSize(20).font("Helvetica-Bold").text(project.title || "Documento", { underline: false });
-    doc.moveDown(0.5);
-    doc.moveTo(50, doc.y).lineTo(545, doc.y).stroke("#cccccc");
-    doc.moveDown(1);
-    doc.fontSize(11).font("Helvetica").text(project.fullText || "", { lineGap: 4 });
+    for (let i = 0; i < pages.length; i++) {
+      const page = pages[i];
+      doc.addPage();
+
+      // Encabezado
+      doc.fontSize(16).font("Helvetica-Bold").text(project.title || "Documento", 50, 50);
+      if (pages.length > 1) {
+        doc.fontSize(10).font("Helvetica").fillColor("#888888")
+          .text(`Página ${i + 1} de ${pages.length}`, { align: "right" });
+        doc.fillColor("#000000");
+      }
+
+      doc.moveDown(0.5);
+      doc.moveTo(50, doc.y).lineTo(545, doc.y).stroke("#cccccc");
+      doc.moveDown(1);
+
+      // Imagen
+      try {
+        const imgBuffer = await fetchImageBuffer(page.imageUrl);
+        const imgY = doc.y;
+        const maxImgHeight = 280;
+        doc.image(imgBuffer, 50, imgY, { fit: [495, maxImgHeight], align: "center" });
+        doc.moveDown(maxImgHeight / doc.currentLineHeight(true) + 1);
+      } catch (imgErr) {
+        logger.warn(`Could not embed image for page ${i + 1}:`, imgErr);
+        doc.fontSize(9).fillColor("#888888").text("[Imagen no disponible]");
+        doc.fillColor("#000000");
+      }
+
+      doc.moveTo(50, doc.y).lineTo(545, doc.y).stroke("#eeeeee");
+      doc.moveDown(0.75);
+
+      // Texto extraído
+      if (page.fullText) {
+        doc.fontSize(10).font("Helvetica").text(page.fullText, { lineGap: 4 });
+      } else {
+        doc.fontSize(9).fillColor("#aaaaaa").text("Sin texto extraído para esta página.");
+        doc.fillColor("#000000");
+      }
+    }
+
     doc.end();
 
     await new Promise<void>((resolve, reject) => {
@@ -113,23 +181,44 @@ export const generatePDF = onCall(async (req) => {
 });
 
 /* =========================
-   Excel
+   Excel — hoja resumen + una hoja por página
 ========================= */
 export const generateExcel = onCall(async (req) => {
   try {
-    const project = req.data?.project;
+    const project: Project = req.data?.project;
     if (!project) throw new HttpsError("invalid-argument", "Missing project");
 
-    const wb = new Workbook();
-    const ws = wb.addWorksheet("Documento");
+    const pages: ProjectPage[] = project.pages || [];
+    if (!pages.length) throw new HttpsError("invalid-argument", "Project has no pages");
 
-    ws.columns = [
+    const wb = new Workbook();
+    wb.creator = "Digidoc CR";
+    wb.created = new Date();
+
+    // Hoja resumen
+    const summary = wb.addWorksheet("Resumen");
+    summary.columns = [
       { header: "Campo", key: "field", width: 20 },
       { header: "Valor", key: "value", width: 80 },
     ];
+    summary.addRow({ field: "Título", value: project.title || "Documento" });
+    summary.addRow({ field: "Total de páginas", value: pages.length });
+    summary.addRow({ field: "Fecha de exportación", value: new Date().toLocaleString("es-CR") });
+    summary.addRow({});
+    summary.addRow({ field: "Texto completo", value: pages.map(p => p.fullText).join("\n\n") });
 
-    ws.addRow({ field: "Título", value: project.title || "Documento" });
-    ws.addRow({ field: "Texto extraído", value: project.fullText || "" });
+    // Una hoja por página
+    pages.forEach((page, i) => {
+      const ws = wb.addWorksheet(`Página ${i + 1}`);
+      ws.columns = [
+        { header: "Campo", key: "field", width: 20 },
+        { header: "Valor", key: "value", width: 80 },
+      ];
+      ws.addRow({ field: "Página", value: i + 1 });
+      ws.addRow({ field: "URL de imagen", value: page.imageUrl });
+      ws.addRow({});
+      ws.addRow({ field: "Texto extraído", value: page.fullText || "Sin texto extraído" });
+    });
 
     const buffer = await wb.xlsx.writeBuffer();
     const uint8Array = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer as ArrayBuffer);

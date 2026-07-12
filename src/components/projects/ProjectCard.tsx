@@ -1,9 +1,7 @@
 import React from 'react';
-import { FileText, Download, Calendar, Trash2, AlignLeft } from 'lucide-react';
-import Button from '../ui/Button';
-import Card from '../ui/Card';
+import { useNavigate } from 'react-router-dom';
+import { Calendar, AlignLeft, Trash2, ArrowRight, Images } from 'lucide-react';
 import { ProjectData } from '../../hooks/useFirestore';
-import { useExport } from '../../hooks/useExport';
 
 interface ProjectCardProps {
   project: ProjectData;
@@ -14,93 +12,89 @@ const formatDate = (timestamp: any): string => {
   if (!timestamp) return '';
   const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
   return new Intl.DateTimeFormat('es-CR', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
+    year: 'numeric', month: 'short', day: 'numeric',
   }).format(date);
 };
 
-const wordCount = (text: string) =>
-  text.trim() ? text.trim().split(/\s+/).length : 0;
+const totalWords = (project: ProjectData) => {
+  const text = project.pages.map(p => p.fullText).join(' ');
+  return text.trim() ? text.trim().split(/\s+/).length : 0;
+};
 
 const ProjectCard: React.FC<ProjectCardProps> = ({ project, onDelete }) => {
-  const { exportToPDF, exportToExcel, exporting } = useExport();
+  const navigate = useNavigate();
+  const firstImage = project.pages[0]?.imageUrl;
+  const previewText = project.pages.map(p => p.fullText).join(' ').trim();
+
+  const handleDelete = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onDelete?.(project);
+  };
 
   return (
-    <Card className="hover:shadow-inner-glass transition-all duration-200 hover:-translate-y-1">
-      <div className="flex flex-col space-y-4">
-
-        {/* Imagen */}
-        <div className="aspect-video bg-surface-container-high rounded-lg overflow-hidden">
-          <img src={project.imageUrl} alt={project.title} className="w-full h-full object-cover" />
-        </div>
-
-        {/* Info */}
-        <div className="space-y-2">
-          <h3 className="text-base font-semibold text-on-surface line-clamp-2">
-            {project.title}
-          </h3>
-
-          <div className="flex items-center justify-between text-xs text-on-surface-variant">
-            <div className="flex items-center gap-1">
-              <Calendar className="w-3.5 h-3.5 shrink-0" />
-              <span>{formatDate(project.updatedAt)}</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <AlignLeft className="w-3.5 h-3.5 shrink-0" />
-              <span>{wordCount(project.fullText)} palabras</span>
-            </div>
+    <div
+      onClick={() => navigate(`/document/${project.id}`)}
+      className="group bg-surface-container border border-outline-variant rounded-xl overflow-hidden cursor-pointer hover:border-primary/30 transition-all duration-200 hover:-translate-y-0.5"
+    >
+      {/* Imagen */}
+      <div className="aspect-video bg-surface-container-high overflow-hidden relative">
+        {firstImage && (
+          <img
+            src={firstImage}
+            alt={project.title}
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+          />
+        )}
+        {/* Badge páginas */}
+        {project.pages.length > 1 && (
+          <div className="absolute top-2 right-2 flex items-center gap-1 bg-black/60 backdrop-blur-sm text-white text-[10px] font-medium px-2 py-1 rounded-full">
+            <Images className="w-3 h-3" />
+            {project.pages.length} págs.
           </div>
-
-          {/* Preview del texto */}
-          {project.fullText && (
-            <p className="text-xs text-on-surface-variant bg-surface-container-low border border-outline-variant rounded-lg px-3 py-2 line-clamp-2 leading-relaxed">
-              {project.fullText}
-            </p>
-          )}
-        </div>
-
-        {/* Acciones */}
-        <div className="flex items-center justify-between pt-3 border-t border-outline-variant">
-          {onDelete && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => onDelete(project)}
-              className="text-error hover:bg-error-container/20"
-            >
-              <Trash2 className="w-4 h-4 mr-1" />
-              Eliminar
-            </Button>
-          )}
-
-          <div className="flex items-center gap-2 ml-auto">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => exportToPDF(project)}
-              loading={exporting}
-              disabled={exporting}
-            >
-              <FileText className="w-4 h-4 mr-1" />
-              PDF
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => exportToExcel(project)}
-              loading={exporting}
-              disabled={exporting}
-            >
-              <Download className="w-4 h-4 mr-1" />
-              Excel
-            </Button>
-          </div>
+        )}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
+        <div className="absolute bottom-3 right-3 w-7 h-7 rounded-full bg-primary/90 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-200 translate-y-1 group-hover:translate-y-0">
+          <ArrowRight className="w-3.5 h-3.5 text-on-primary" />
         </div>
       </div>
-    </Card>
+
+      {/* Info */}
+      <div className="p-4 space-y-3">
+        <h3 className="text-sm font-semibold text-on-surface line-clamp-1 group-hover:text-primary transition-colors">
+          {project.title}
+        </h3>
+
+        <div className="flex items-center justify-between text-xs text-on-surface-variant">
+          <div className="flex items-center gap-1">
+            <Calendar className="w-3 h-3 shrink-0" />
+            <span>{formatDate(project.updatedAt)}</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <AlignLeft className="w-3 h-3 shrink-0" />
+            <span>{totalWords(project)} palabras</span>
+          </div>
+        </div>
+
+        {previewText && (
+          <p className="text-xs text-on-surface-variant line-clamp-2 leading-relaxed">
+            {previewText}
+          </p>
+        )}
+
+        <div className="flex items-center justify-between pt-2 border-t border-outline-variant/50">
+          <span className="text-xs text-primary/70 font-medium">Ver documento →</span>
+          {onDelete && (
+            <button
+              onClick={handleDelete}
+              aria-label="Eliminar"
+              className="p-1.5 rounded-lg text-on-surface-variant hover:text-error hover:bg-error-container/20 transition-colors"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
   );
 };
 

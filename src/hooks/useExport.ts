@@ -7,21 +7,23 @@ import toast from 'react-hot-toast';
 export const useExport = () => {
   const [exporting, setExporting] = useState(false);
 
+  const triggerDownload = (url: string, filename: string) => {
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    link.target = '_blank';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   const exportToPDF = async (project: ProjectData): Promise<void> => {
     setExporting(true);
     try {
       const generatePDF = httpsCallable(functions, 'generatePDF');
       const result = await generatePDF({ project });
-      const { downloadUrl, filename } = result.data as { downloadUrl: string; filename?: string };
-
-      const link = document.createElement('a');
-      link.href = downloadUrl;
-      link.download = filename || `${project.title || 'project'}.pdf`;
-      link.target = '_self';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-
+      const { downloadUrl, filename } = result.data as { downloadUrl: string; filename: string };
+      triggerDownload(downloadUrl, filename);
       toast.success('PDF exportado correctamente');
     } catch (error) {
       console.error('Error exporting PDF:', error);
@@ -36,16 +38,8 @@ export const useExport = () => {
     try {
       const generateExcel = httpsCallable(functions, 'generateExcel');
       const result = await generateExcel({ project });
-      const { downloadUrl, filename } = result.data as { downloadUrl: string; filename?: string };
-
-      const link = document.createElement('a');
-      link.href = downloadUrl;
-      link.download = filename || `${project.title || 'project'}.xlsx`;
-      link.target = '_self';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-
+      const { downloadUrl, filename } = result.data as { downloadUrl: string; filename: string };
+      triggerDownload(downloadUrl, filename);
       toast.success('Excel exportado correctamente');
     } catch (error) {
       console.error('Error exporting Excel:', error);

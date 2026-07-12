@@ -16,12 +16,16 @@ import { useAuthState } from './useAuth';
 import toast from 'react-hot-toast';
 import { getStorage, deleteObject, ref } from 'firebase/storage';
 
+export interface ProjectPage {
+  imageUrl: string;
+  fullText: string;
+}
+
 export interface ProjectData {
   id?: string;
   userId: string;
   title: string;
-  imageUrl: string;
-  fullText: string;
+  pages: ProjectPage[];
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }
@@ -90,16 +94,25 @@ export const useFirestore = () => {
     }
   };
 
-  const deleteProject = async (projectId: string, imageUrl?: string): Promise<void> => {
+  const deleteProject = async (projectId: string, pages?: ProjectPage[]): Promise<void> => {
     setLoading(true);
     try {
       await deleteDoc(doc(db, 'projects', projectId));
-      if (imageUrl) {
-        try {
-          await deleteObject(ref(storage, imageUrl));
-        } catch (err) {
-          console.warn('Could not delete image from Storage:', err);
-        }
+      if (pages?.length) {
+        await Promise.allSettled(
+          pages.map(p => {
+            try {
+              // imageUrl es una URL de descarga, hay que extraer el path del objeto
+              const url = new URL(p.imageUrl);
+              const encodedPath = url.pathname.split('/o/')[1];
+              if (!encodedPath) return Promise.resolve();
+              const storagePath = decodeURIComponent(encodedPath.split('?')[0]);
+              return deleteObject(ref(storage, storagePath));
+            } catch {
+              return Promise.resolve();
+            }
+          })
+        );
       }
       toast.success('Proyecto eliminado');
     } catch (error) {
