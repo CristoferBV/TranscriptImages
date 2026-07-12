@@ -34,7 +34,7 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, onDelete }) => {
   return (
     <div
       onClick={() => navigate(`/document/${project.id}`)}
-      className="group bg-surface-container border border-outline-variant rounded-xl overflow-hidden cursor-pointer hover:border-primary/30 transition-all duration-200 hover:-translate-y-0.5"
+      className="group bg-surface-container border border-outline-variant rounded-lg overflow-hidden cursor-pointer hover:border-primary/30 transition-all duration-200 hover:-translate-y-0.5"
     >
       {/* Imagen */}
       <div className="aspect-video bg-surface-container-high overflow-hidden relative">

@@ -6,8 +6,6 @@ import type { File } from "@google-cloud/storage";
 import PDFDocument = require("pdfkit");
 import { Workbook } from "exceljs";
 import { ImageAnnotatorClient } from "@google-cloud/vision";
-import * as https from "https";
-import * as http from "http";
 
 admin.initializeApp();
 setGlobalOptions({ region: "us-central1", maxInstances: 10 });
@@ -37,12 +35,12 @@ function buildFileName(title: string | undefined, ext: "pdf" | "xlsx") {
   return `${base}.${ext}`;
 }
 
-async function signedUrl(file: File, filename: string, contentType?: string): Promise<string> {
+async function signedUrl(file: File, filename: string, disposition: "inline" | "attachment", contentType?: string): Promise<string> {
   const cfg: any = {
     version: "v4",
     action: "read",
     expires: Date.now() + 24 * 60 * 60 * 1000,
-    responseDisposition: `attachment; filename="${filename}"`,
+    responseDisposition: `${disposition}; filename="${filename}"`,
   };
   if (contentType) cfg.responseType = contentType;
   const [url] = await file.getSignedUrl(cfg);
@@ -56,18 +54,6 @@ function normalize(text: string) {
     .replace(/\t/g, " ")
     .replace(/[ ]{2,}/g, " ")
     .trim();
-}
-
-function fetchImageBuffer(url: string): Promise<Buffer> {
-  return new Promise((resolve, reject) => {
-    const client = url.startsWith("https") ? https : http;
-    client.get(url, (res) => {
-      const chunks: Buffer[] = [];
-      res.on("data", (chunk) => chunks.push(chunk));
-      res.on("end", () => resolve(Buffer.concat(chunks)));
-      res.on("error", reject);
-    }).on("error", reject);
-  });
 }
 
 /* =========================
@@ -98,7 +84,7 @@ export const processOCR = onCall(async (request) => {
 });
 
 /* =========================
-   PDF — una página por imagen
+   PDF — solo texto, abre en vista previa
 ========================= */
 export const generatePDF = onCall(async (req) => {
   try {
@@ -116,55 +102,56 @@ export const generatePDF = onCall(async (req) => {
     const stream = file.createWriteStream({
       metadata: {
         contentType: "application/pdf",
-        contentDisposition: `attachment; filename="${downloadName}"`,
+        contentDisposition: `inline; filename="${downloadName}"`,
         cacheControl: "public, max-age=3600",
       },
     });
 
-    const doc = new PDFDocument({ size: "A4", margin: 50, autoFirstPage: false });
+    const footerText = `Digidoc CR — ${new Date().toLocaleDateString("es-CR")}`;
+    const doc = new PDFDocument({ size: "A4", margin: 60, autoFirstPage: false, bufferPages: true });
     doc.pipe(stream);
 
     for (let i = 0; i < pages.length; i++) {
       const page = pages[i];
       doc.addPage();
 
-      // Encabezado
-      doc.fontSize(16).font("Helvetica-Bold").text(project.title || "Documento", 50, 50);
+      // Título
+      doc.fontSize(18).font("Helvetica-Bold")
+        .fillColor("#111111")
+        .text(project.title || "Documento", { align: "left" });
+
       if (pages.length > 1) {
         doc.fontSize(10).font("Helvetica").fillColor("#888888")
           .text(`Página ${i + 1} de ${pages.length}`, { align: "right" });
-        doc.fillColor("#000000");
       }
 
       doc.moveDown(0.5);
-      doc.moveTo(50, doc.y).lineTo(545, doc.y).stroke("#cccccc");
+      doc.moveTo(60, doc.y).lineTo(535, doc.y).lineWidth(0.5).stroke("#cccccc");
       doc.moveDown(1);
 
-      // Imagen
-      try {
-        const imgBuffer = await fetchImageBuffer(page.imageUrl);
-        const imgY = doc.y;
-        const maxImgHeight = 280;
-        doc.image(imgBuffer, 50, imgY, { fit: [495, maxImgHeight], align: "center" });
-        doc.moveDown(maxImgHeight / doc.currentLineHeight(true) + 1);
-      } catch (imgErr) {
-        logger.warn(`Could not embed image for page ${i + 1}:`, imgErr);
-        doc.fontSize(9).fillColor("#888888").text("[Imagen no disponible]");
-        doc.fillColor("#000000");
-      }
-
-      doc.moveTo(50, doc.y).lineTo(545, doc.y).stroke("#eeeeee");
-      doc.moveDown(0.75);
-
-      // Texto extraído
+      // Texto
       if (page.fullText) {
-        doc.fontSize(10).font("Helvetica").text(page.fullText, { lineGap: 4 });
+        doc.fontSize(11).font("Helvetica").fillColor("#222222")
+          .text(page.fullText, { lineGap: 5, paragraphGap: 8 });
       } else {
-        doc.fontSize(9).fillColor("#aaaaaa").text("Sin texto extraído para esta página.");
-        doc.fillColor("#000000");
+        doc.fontSize(10).fillColor("#aaaaaa").text("Sin texto extraído para esta página.");
       }
     }
 
+    // Footer: iterar páginas en buffer sin mover el cursor de flujo
+    const range = doc.bufferedPageRange();
+    for (let i = 0; i < range.count; i++) {
+      doc.switchToPage(range.start + i);
+      // Guardar estado, resetear márgenes y escribir footer en posición absoluta
+      doc.save();
+      doc.fontSize(8).font("Helvetica").fillColor("#bbbbbb");
+      const footerY = doc.page.height - 50;
+      doc.page.margins = { top: 0, bottom: 0, left: 0, right: 0 };
+      doc.text(footerText, 0, footerY, { align: "center", width: doc.page.width, lineBreak: false });
+      doc.restore();
+    }
+
+    doc.flushPages();
     doc.end();
 
     await new Promise<void>((resolve, reject) => {
@@ -172,7 +159,7 @@ export const generatePDF = onCall(async (req) => {
       stream.on("error", reject);
     });
 
-    const downloadUrl = await signedUrl(file, downloadName, "application/pdf");
+    const downloadUrl = await signedUrl(file, downloadName, "inline", "application/pdf");
     return { downloadUrl, filename: downloadName };
   } catch (err: any) {
     logger.error("generatePDF error:", err);
@@ -215,7 +202,6 @@ export const generateExcel = onCall(async (req) => {
         { header: "Valor", key: "value", width: 80 },
       ];
       ws.addRow({ field: "Página", value: i + 1 });
-      ws.addRow({ field: "URL de imagen", value: page.imageUrl });
       ws.addRow({});
       ws.addRow({ field: "Texto extraído", value: page.fullText || "Sin texto extraído" });
     });
@@ -240,6 +226,7 @@ export const generateExcel = onCall(async (req) => {
     const downloadUrl = await signedUrl(
       file,
       downloadName,
+      "attachment",
       "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     );
 

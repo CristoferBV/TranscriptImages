@@ -209,9 +209,9 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
               Cancelar
             </Button>
             {selectedFiles.length > 0 && (
-              <Button onClick={handleProcess} className="flex-1 sm:flex-none btn-auth-primary">
+              <button onClick={handleProcess} className="btn-auth-primary flex-1 sm:flex-none px-5 py-2.5 rounded-full text-sm font-semibold flex items-center justify-center gap-2">
                 Procesar {selectedFiles.length} {selectedFiles.length === 1 ? 'imagen' : 'imágenes'}
-              </Button>
+              </button>
             )}
           </div>
         </Card>

@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
-  ArrowLeft, FileText, Download, Copy, Share2,
-  Check, Edit3, Save, X, Trash2, Calendar, AlignLeft, ChevronLeft, ChevronRight,
+  ArrowLeft, FileText, Download, Copy,
+  Check, Edit3, Save, X, Trash2, Calendar,
 } from 'lucide-react';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../config/firebase';
@@ -23,10 +23,8 @@ const formatDate = (timestamp: any): string => {
   }).format(date);
 };
 
-const totalWords = (pages: ProjectPage[]) => {
-  const text = pages.map(p => p.fullText).join(' ');
-  return text.trim() ? text.trim().split(/\s+/).length : 0;
-};
+const pageWordCount = (text: string) =>
+  text.trim() ? text.trim().split(/\s+/).length : 0;
 
 const DocumentDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -43,7 +41,7 @@ const DocumentDetailPage: React.FC = () => {
   const [saving, setSaving] = useState(false);
 
   const { updateProject, deleteProject } = useFirestore();
-  const { exportToPDF, exportToExcel, exporting } = useExport();
+  const { exportToPDF, exportToExcel, exportingPDF, exportingExcel } = useExport();
 
   useEffect(() => {
     if (!id) return;
@@ -67,19 +65,13 @@ const DocumentDetailPage: React.FC = () => {
 
   const handleCopy = async () => {
     if (!project) return;
-    const text = project.pages.map((p, i) =>
-      isMultiPage ? `--- Página ${i + 1} ---\n${p.fullText}` : p.fullText
-    ).join('\n\n');
+    const text = isMultiPage
+      ? `--- Página ${activePage + 1} ---\n${currentPage.fullText}`
+      : currentPage.fullText;
     await navigator.clipboard.writeText(text);
     setCopied(true);
     toast.success('Texto copiado al portapapeles');
     setTimeout(() => setCopied(false), 2000);
-  };
-
-  const handleShare = () => {
-    if (!project) return;
-    const text = `*${project.title}*\n\n${project.pages.map(p => p.fullText).join('\n\n')}`;
-    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
   };
 
   const updatePageText = (text: string) => {
@@ -122,13 +114,13 @@ const DocumentDetailPage: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-app-bg">
+    <div className="min-h-screen bg-app-bg flex flex-col">
       <div className="auth-ambient-orb-1" />
       <div className="auth-ambient-orb-2" />
 
       {/* Header */}
-      <header className="auth-glass-card border-b border-white/5 sticky top-0 z-30">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 h-14 sm:h-16 flex items-center justify-between gap-4">
+      <header className="auth-glass-card border-b border-white/5 sticky top-0 z-30 shrink-0">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 h-14 sm:h-16 flex items-center justify-between gap-4">
           <button
             onClick={() => navigate('/dashboard')}
             className="flex items-center gap-2 text-on-surface-variant hover:text-on-surface transition-colors shrink-0"
@@ -137,173 +129,186 @@ const DocumentDetailPage: React.FC = () => {
             <span className="text-sm hidden sm:inline">Mis documentos</span>
           </button>
 
-          <h1 className="text-sm sm:text-base font-semibold text-on-surface truncate flex-1 text-center px-2">
-            {project.title}
-          </h1>
-
-          {/* Actions desktop */}
-          <div className="hidden sm:flex items-center gap-2 shrink-0">
-            <Button variant="ghost" size="sm" onClick={handleCopy}>
-              {copied ? <Check className="w-4 h-4 text-primary" /> : <Copy className="w-4 h-4" />}
-            </Button>
-            <Button variant="ghost" size="sm" onClick={handleShare}>
-              <Share2 className="w-4 h-4" />
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => exportToPDF(project)} loading={exporting} disabled={exporting}>
-              <FileText className="w-4 h-4 mr-1.5" />PDF
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => exportToExcel(project)} loading={exporting} disabled={exporting}>
-              <Download className="w-4 h-4 mr-1.5" />Excel
-            </Button>
-            <button onClick={() => setConfirmDelete(true)} className="p-2 rounded-lg text-on-surface-variant hover:text-error hover:bg-error-container/20 transition-colors">
-              <Trash2 className="w-4 h-4" />
-            </button>
+          <div className="flex-1 min-w-0 text-center">
+            <h1 className="text-sm sm:text-base font-semibold text-on-surface truncate">
+              {project.title}
+            </h1>
+            <p className="text-xs text-on-surface-variant hidden sm:block">
+              <Calendar className="w-3 h-3 inline mr-1" />
+              {formatDate(project.updatedAt)}
+            </p>
           </div>
 
-          {/* Actions mobile */}
-          <div className="flex sm:hidden items-center gap-1 shrink-0">
-            <button onClick={handleCopy} className="p-2 rounded-lg text-on-surface-variant hover:text-primary transition-colors">
+          <div className="flex items-center gap-1.5 shrink-0">
+            <button
+              onClick={handleCopy}
+              title="Copiar todo el texto"
+              className="p-2 rounded-lg text-on-surface-variant hover:text-primary hover:bg-primary/10 transition-colors"
+            >
               {copied ? <Check className="w-4 h-4 text-primary" /> : <Copy className="w-4 h-4" />}
             </button>
-            <button onClick={handleShare} className="p-2 rounded-lg text-on-surface-variant hover:text-primary transition-colors">
-              <Share2 className="w-4 h-4" />
-            </button>
-            <button onClick={() => setConfirmDelete(true)} className="p-2 rounded-lg text-on-surface-variant hover:text-error transition-colors">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => exportToPDF(project)}
+              loading={exportingPDF}
+              disabled={exportingPDF || exportingExcel}
+            >
+              <FileText className="w-4 h-4 sm:mr-1.5" />
+              <span className="hidden sm:inline">PDF</span>
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => exportToExcel(project)}
+              loading={exportingExcel}
+              disabled={exportingPDF || exportingExcel}
+            >
+              <Download className="w-4 h-4 sm:mr-1.5" />
+              <span className="hidden sm:inline">Excel</span>
+            </Button>
+            <button
+              onClick={() => setConfirmDelete(true)}
+              title="Eliminar documento"
+              className="p-2 rounded-lg text-on-surface-variant hover:text-error hover:bg-error-container/20 transition-colors"
+            >
               <Trash2 className="w-4 h-4" />
             </button>
           </div>
         </div>
       </header>
 
-      <div className="relative z-10 max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6">
+      {/* Body — layout de 3 columnas en desktop */}
+      <div className="relative z-10 flex-1 flex flex-col lg:flex-row max-w-7xl mx-auto w-full px-4 sm:px-6 py-6 gap-6">
 
-        {/* Meta */}
-        <div className="flex items-center justify-between text-xs text-on-surface-variant">
-          <div className="flex items-center gap-1.5">
-            <Calendar className="w-3.5 h-3.5" />
-            <span>{formatDate(project.updatedAt)}</span>
-          </div>
-          <div className="flex items-center gap-4">
-            {isMultiPage && (
-              <span className="text-primary font-medium">{project.pages.length} páginas</span>
-            )}
-            <div className="flex items-center gap-1.5">
-              <AlignLeft className="w-3.5 h-3.5" />
-              <span>{totalWords(editedPages)} palabras totales</span>
+        {/* Columna izquierda: grid de miniaturas */}
+        {isMultiPage && (
+          <aside className="lg:w-48 shrink-0">
+            <p className="text-xs font-medium text-on-surface-variant mb-3 uppercase tracking-wider">
+              Páginas ({editedPages.length})
+            </p>
+            {/* Desktop: lista vertical */}
+            <div className="hidden lg:flex flex-col gap-2">
+              {editedPages.map((p, i) => (
+                <button
+                  key={i}
+                  onClick={() => { setActivePage(i); setIsEditing(false); }}
+                  className={`group relative rounded-lg overflow-hidden border-2 transition-all ${
+                    activePage === i
+                      ? 'border-primary shadow-glow-cyan'
+                      : 'border-outline-variant hover:border-primary/50'
+                  }`}
+                >
+                  <img
+                    src={p.imageUrl}
+                    alt={`Página ${i + 1}`}
+                    className="w-full aspect-[3/4] object-cover"
+                  />
+                  <div className={`absolute inset-0 flex items-end p-1.5 bg-gradient-to-t from-black/70 to-transparent`}>
+                    <span className="text-[10px] font-semibold text-white">Pág. {i + 1}</span>
+                  </div>
+                  {activePage === i && (
+                    <div className="absolute top-1.5 right-1.5 w-4 h-4 rounded-full bg-primary flex items-center justify-center">
+                      <Check className="w-2.5 h-2.5 text-on-primary" />
+                    </div>
+                  )}
+                </button>
+              ))}
             </div>
+            {/* Mobile: scroll horizontal */}
+            <div className="flex lg:hidden gap-2 overflow-x-auto pb-1">
+              {editedPages.map((p, i) => (
+                <button
+                  key={i}
+                  onClick={() => { setActivePage(i); setIsEditing(false); }}
+                  className={`relative shrink-0 w-16 rounded-lg overflow-hidden border-2 transition-all ${
+                    activePage === i
+                      ? 'border-primary'
+                      : 'border-outline-variant hover:border-primary/50'
+                  }`}
+                >
+                  <img src={p.imageUrl} alt={`Página ${i + 1}`} className="w-full aspect-[3/4] object-cover" />
+                  <div className="absolute inset-0 flex items-end p-1 bg-gradient-to-t from-black/70 to-transparent">
+                    <span className="text-[9px] font-semibold text-white">{i + 1}</span>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </aside>
+        )}
+
+        {/* Columna central: imagen grande */}
+        <div className={`flex flex-col gap-3 ${isMultiPage ? 'lg:flex-1' : 'lg:w-1/2'}`}>
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-medium text-on-surface-variant uppercase tracking-wider">
+              {isMultiPage ? `Imagen — Página ${activePage + 1}` : 'Imagen escaneada'}
+            </span>
+          </div>
+          <div className="rounded-lg overflow-hidden border border-outline-variant bg-surface-container-high flex-1">
+            <img
+              src={currentPage.imageUrl}
+              alt={`Página ${activePage + 1}`}
+              className="w-full object-contain max-h-[70vh] lg:max-h-full"
+            />
           </div>
         </div>
 
-        {/* Tabs de páginas */}
-        {isMultiPage && (
-          <div className="flex items-center gap-2 overflow-x-auto pb-1">
-            {editedPages.map((p, i) => (
-              <button
-                key={i}
-                onClick={() => { setActivePage(i); setIsEditing(false); }}
-                className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium whitespace-nowrap transition-colors shrink-0 border ${
-                  activePage === i
-                    ? 'bg-primary/15 text-primary border-primary/30'
-                    : 'bg-surface-container text-on-surface-variant border-outline-variant hover:text-on-surface'
-                }`}
-              >
-                <img src={p.imageUrl} alt="" className="w-6 h-6 rounded object-cover" />
-                Página {i + 1}
-              </button>
-            ))}
-          </div>
-        )}
-
-        {/* Contenido principal */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-
-          {/* Imagen */}
-          <div className="space-y-3">
-            <div className="rounded-2xl overflow-hidden border border-outline-variant bg-surface-container-high">
-              <img
-                src={currentPage.imageUrl}
-                alt={`Página ${activePage + 1}`}
-                className="w-full object-contain max-h-[60vh]"
-              />
-            </div>
-
-            {/* Navegación prev/next */}
-            {isMultiPage && (
-              <div className="flex items-center justify-between">
-                <button
-                  onClick={() => { setActivePage(p => Math.max(0, p - 1)); setIsEditing(false); }}
-                  disabled={activePage === 0}
-                  className="flex items-center gap-1 text-sm text-on-surface-variant disabled:opacity-30 hover:text-on-surface transition-colors"
-                >
-                  <ChevronLeft className="w-4 h-4" /> Anterior
-                </button>
-                <span className="text-xs text-on-surface-variant">{activePage + 1} / {editedPages.length}</span>
-                <button
-                  onClick={() => { setActivePage(p => Math.min(editedPages.length - 1, p + 1)); setIsEditing(false); }}
-                  disabled={activePage === editedPages.length - 1}
-                  className="flex items-center gap-1 text-sm text-on-surface-variant disabled:opacity-30 hover:text-on-surface transition-colors"
-                >
-                  Siguiente <ChevronRight className="w-4 h-4" />
-                </button>
-              </div>
-            )}
-
-            {/* Export mobile */}
-            <div className="flex gap-3 sm:hidden">
-              <Button variant="outline" size="sm" onClick={() => exportToPDF(project)} loading={exporting} disabled={exporting} className="flex-1">
-                <FileText className="w-4 h-4 mr-1.5" />PDF
-              </Button>
-              <Button variant="outline" size="sm" onClick={() => exportToExcel(project)} loading={exporting} disabled={exporting} className="flex-1">
-                <Download className="w-4 h-4 mr-1.5" />Excel
-              </Button>
-            </div>
-          </div>
-
-          {/* Texto */}
-          <div className="flex flex-col gap-3">
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-medium text-on-surface">
+        {/* Columna derecha: texto */}
+        <div className={`flex flex-col gap-3 ${isMultiPage ? 'lg:flex-1' : 'lg:w-1/2'}`}>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-medium text-on-surface-variant uppercase tracking-wider">
                 {isMultiPage ? `Texto — Página ${activePage + 1}` : 'Texto extraído'}
               </span>
-              <div className="flex items-center gap-2">
-                {isEditing && (
-                  <button
-                    onClick={() => { setIsEditing(false); setEditedPages(project.pages); }}
-                    className="p-1 rounded-full text-on-surface-variant hover:text-on-surface transition-colors"
-                  >
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                )}
-                <button
-                  onClick={() => isEditing ? handleSaveEdit() : setIsEditing(true)}
-                  disabled={saving}
-                  className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full transition-colors ${
-                    isEditing
-                      ? 'bg-primary/15 text-primary hover:bg-primary/25'
-                      : 'bg-surface-container-high text-on-surface-variant hover:text-on-surface'
-                  }`}
-                >
-                  {saving ? <LoadingSpinner size="sm" /> : isEditing ? <><Save className="w-3.5 h-3.5" />Guardar</> : <><Edit3 className="w-3.5 h-3.5" />Editar</>}
-                </button>
-              </div>
+              <span className="text-xs text-on-surface-variant bg-surface-container-high px-2 py-0.5 rounded-full">
+                {pageWordCount(currentPage.fullText)} palabras
+              </span>
             </div>
-
-            {isEditing ? (
-              <textarea
-                value={currentPage.fullText}
-                onChange={(e) => updatePageText(e.target.value)}
-                autoFocus
-                className="flex-1 min-h-[400px] lg:min-h-[500px] w-full p-4 rounded-xl resize-none bg-surface-container-low border border-primary/50 ring-2 ring-primary/20 text-on-surface text-sm leading-relaxed focus:outline-none transition-colors"
-              />
-            ) : (
-              <div
-                onClick={() => setIsEditing(true)}
-                className="flex-1 min-h-[400px] lg:min-h-[500px] p-4 rounded-xl overflow-y-auto bg-surface-container-low border border-outline-variant text-on-surface text-sm leading-relaxed whitespace-pre-wrap cursor-text hover:border-outline transition-colors"
+            <div className="flex items-center gap-2">
+              {isEditing && (
+                <button
+                  onClick={() => { setIsEditing(false); setEditedPages(project.pages); }}
+                  className="p-1 rounded-full text-on-surface-variant hover:text-on-surface transition-colors"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+              <button
+                onClick={() => isEditing ? handleSaveEdit() : setIsEditing(true)}
+                disabled={saving}
+                className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full transition-colors ${
+                  isEditing
+                    ? 'bg-primary/15 text-primary hover:bg-primary/25'
+                    : 'bg-surface-container-high text-on-surface-variant hover:text-on-surface'
+                }`}
               >
-                {currentPage.fullText || <span className="text-outline italic">Sin texto extraído</span>}
-              </div>
-            )}
+                {saving
+                  ? <LoadingSpinner size="sm" />
+                  : isEditing
+                    ? <><Save className="w-3.5 h-3.5" />Guardar</>
+                    : <><Edit3 className="w-3.5 h-3.5" />Editar</>
+                }
+              </button>
+            </div>
           </div>
+
+          {isEditing ? (
+            <textarea
+              value={currentPage.fullText}
+              onChange={(e) => updatePageText(e.target.value)}
+              autoFocus
+              className="flex-1 min-h-[400px] lg:min-h-0 lg:h-full w-full p-4 rounded-lg resize-none bg-surface-container-low border border-primary/50 ring-2 ring-primary/20 text-on-surface text-sm leading-relaxed focus:outline-none transition-colors"
+            />
+          ) : (
+            <div
+              onClick={() => setIsEditing(true)}
+              className="flex-1 min-h-[400px] lg:min-h-0 p-4 rounded-lg overflow-y-auto bg-surface-container-low border border-outline-variant text-on-surface text-sm leading-relaxed whitespace-pre-wrap cursor-text hover:border-outline transition-colors"
+            >
+              {currentPage.fullText || (
+                <span className="text-outline italic">Sin texto extraído para esta página</span>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
