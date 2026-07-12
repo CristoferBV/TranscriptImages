@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { ScanText, FolderOpen, LogOut, User } from 'lucide-react';
+import { ScanText, FolderOpen, LogOut, User, BarChart2 } from 'lucide-react';
 import { useAuthState, useAuthActions } from '../../hooks/useAuth';
 import ConfirmDialog from './ConfirmDialog';
 
@@ -58,6 +58,18 @@ const Sidebar: React.FC<SidebarProps> = ({ documentCount, onNewScan }) => {
             <span className="ml-auto text-xs bg-surface-container-high px-2 py-0.5 rounded-full">
               {documentCount}
             </span>
+          </button>
+
+          <button
+            onClick={() => navigate('/stats')}
+            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${
+              isActive('/stats')
+                ? 'bg-primary/10 text-primary border border-primary/20'
+                : 'text-on-surface-variant hover:bg-surface-container hover:text-on-surface'
+            }`}
+          >
+            <BarChart2 className="w-4 h-4" />
+            Estadísticas
           </button>
         </nav>
 
