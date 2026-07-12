@@ -23,13 +23,6 @@ const EmptyState: React.FC<EmptyStateProps> = ({ onScan }) => (
       Escanea tu primer documento y convierte cualquier imagen en texto digital editable.
     </p>
 
-    <button
-      onClick={onScan}
-      className="btn-auth-primary px-8 py-3.5 rounded-full text-sm font-semibold flex items-center gap-2"
-    >
-      <ScanText className="w-4 h-4" />
-      Escanear ahora
-    </button>
   </div>
 );
 

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Save, X, FileText, Edit3, Check, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Save, X, FileText, Edit3, Check, ChevronLeft, ChevronRight, RotateCw, ZoomIn, ZoomOut} from 'lucide-react';
 import Button from '../ui/Button';
 import { ProjectPage } from '../../hooks/useFirestore';
 
@@ -23,9 +23,28 @@ const OCRResults: React.FC<OCRResultsProps> = ({
   const [editedPages, setEditedPages] = useState<ProjectPage[]>(pages);
   const [activePage, setActivePage] = useState(0);
   const [isEditing, setIsEditing] = useState(false);
+  const [rotation, setRotation] = useState(0);
+  const [zoom, setZoom] = useState(1);
 
   const current = editedPages[activePage];
   const wordCount = current.fullText.trim() ? current.fullText.trim().split(/\s+/).length : 0;
+
+  const rotateImage = () => {
+      setRotation(prev => (prev + 90) % 360);
+  };
+
+  const zoomIn = () => {
+      setZoom(prev => Math.min(prev + 0.25, 3));
+  };
+
+  const zoomOut = () => {
+      setZoom(prev => Math.max(prev - 0.25, 0.5));
+  };
+
+  const resetImageView = () => {
+      setRotation(0);
+      setZoom(1);
+  };
 
   const updateText = (text: string) => {
     setEditedPages(prev =>
@@ -37,7 +56,7 @@ const OCRResults: React.FC<OCRResultsProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black/60 flex items-end sm:items-center justify-center p-0 sm:p-4 z-50">
-      <div className="bg-surface-container border border-outline-variant rounded-t-2xl sm:rounded-2xl shadow-2xl w-full max-w-3xl h-[95vh] sm:h-[90vh] flex flex-col">
+      <div className="bg-surface-container border border-outline-variant rounded-t-2xl sm:rounded-2xl shadow-2xl w-full max-w-5xl h-[95vh] sm:h-[90vh] flex flex-col">
 
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-outline-variant shrink-0">
@@ -76,7 +95,11 @@ const OCRResults: React.FC<OCRResultsProps> = ({
               {editedPages.map((p, i) => (
                 <button
                   key={i}
-                  onClick={() => { setActivePage(i); setIsEditing(false); }}
+                  onClick={() => {
+                    setActivePage(i);
+                    setIsEditing(false);
+                    resetImageView();
+                  }}
                   className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors shrink-0 ${
                     activePage === i
                       ? 'bg-primary/15 text-primary border border-primary/30'
@@ -91,23 +114,82 @@ const OCRResults: React.FC<OCRResultsProps> = ({
           )}
 
           {/* Vista de la página activa */}
-          <div className="flex flex-col sm:flex-row gap-4 flex-1 min-h-0">
+          <div className="flex flex-col md:flex-row gap-4 flex-1 min-h-0">
 
-            {/* Miniatura de imagen */}
-            <div className="sm:w-40 shrink-0">
-              <img
-                src={current.imageUrl}
-                alt={`Página ${activePage + 1}`}
-                className="w-full sm:w-40 h-32 sm:h-full object-cover rounded-xl border border-outline-variant"
-              />
+          {/* Vista previa de la imagen */}
+          <div className="w-full md:w-[38%] lg:w-[40%] shrink-0 flex flex-col min-h-0">
+            {/* Controles */}
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs text-on-surface-variant">
+                Vista del documento
+              </span>
+
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={zoomOut}
+                  disabled={zoom <= 0.5}
+                  aria-label="Alejar imagen"
+                  title="Alejar"
+                  className="p-1.5 rounded-lg bg-surface-container-high text-on-surface-variant hover:text-on-surface disabled:opacity-30 transition-colors"
+                >
+                  <ZoomOut className="w-4 h-4" />
+                </button>
+
+                <span className="min-w-[42px] text-center text-xs text-on-surface-variant">
+                  {Math.round(zoom * 100)}%
+                </span>
+
+                <button
+                  type="button"
+                  onClick={zoomIn}
+                  disabled={zoom >= 3}
+                  aria-label="Acercar imagen"
+                  title="Acercar"
+                  className="p-1.5 rounded-lg bg-surface-container-high text-on-surface-variant hover:text-on-surface disabled:opacity-30 transition-colors"
+                >
+                  <ZoomIn className="w-4 h-4" />
+                </button>
+
+                <button
+                  type="button"
+                  onClick={rotateImage}
+                  aria-label="Rotar imagen"
+                  title="Rotar 90 grados"
+                  className="p-1.5 rounded-lg bg-surface-container-high text-on-surface-variant hover:text-on-surface transition-colors"
+                >
+                  <RotateCw className="w-4 h-4" />
+                </button>
+              </div>
             </div>
+
+            {/* Imagen */}
+            <div className="relative flex-1 min-h-[300px] md:min-h-[430px] overflow-auto rounded-xl border border-outline-variant bg-black/10">
+              <div className="absolute inset-0 min-w-full min-h-full flex items-center justify-center p-4">
+                <img
+                  src={current.imageUrl}
+                  alt={`Página ${activePage + 1}`}
+                  draggable={false}
+                  className="block max-w-none rounded-lg shadow-md transition-transform duration-200 select-none"
+                  style={{
+                    width: `${zoom * 100}%`,
+                    height: 'auto',
+                    transform: `rotate(${rotation}deg)`,
+                    transformOrigin: 'center',
+                  }}
+                />
+              </div>
+            </div>
+          </div>
 
             {/* Texto */}
             <div className="flex-1 flex flex-col min-h-0">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-xs text-on-surface-variant">
-                  {isMultiPage ? `Página ${activePage + 1} · ` : ''}{wordCount} palabras
+                  {isMultiPage ? `Página ${activePage + 1} · ` : ''}
+                  {wordCount} palabras
                 </span>
+
                 <button
                   onClick={() => setIsEditing(v => !v)}
                   className={`flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full transition-colors ${
@@ -116,7 +198,17 @@ const OCRResults: React.FC<OCRResultsProps> = ({
                       : 'bg-surface-container-high text-on-surface-variant hover:text-on-surface'
                   }`}
                 >
-                  {isEditing ? <><Check className="w-3.5 h-3.5" />Listo</> : <><Edit3 className="w-3.5 h-3.5" />Editar</>}
+                  {isEditing ? (
+                    <>
+                      <Check className="w-3.5 h-3.5" />
+                      Listo
+                    </>
+                  ) : (
+                    <>
+                      <Edit3 className="w-3.5 h-3.5" />
+                      Editar
+                    </>
+                  )}
                 </button>
               </div>
 
@@ -125,14 +217,18 @@ const OCRResults: React.FC<OCRResultsProps> = ({
                   value={current.fullText}
                   onChange={(e) => updateText(e.target.value)}
                   autoFocus
-                  className="flex-1 w-full min-h-[180px] p-4 rounded-xl resize-none bg-surface-container-low border border-primary/50 ring-2 ring-primary/20 text-on-surface text-sm leading-relaxed focus:outline-none"
+                  className="flex-1 w-full min-h-[260px] p-4 rounded-xl resize-none bg-surface-container-low border border-primary/50 ring-2 ring-primary/20 text-on-surface text-sm leading-relaxed focus:outline-none"
                 />
               ) : (
                 <div
                   onClick={() => setIsEditing(true)}
-                  className="flex-1 min-h-[180px] p-4 rounded-xl bg-surface-container-low border border-outline-variant text-on-surface text-sm leading-relaxed whitespace-pre-wrap overflow-y-auto cursor-text hover:border-outline transition-colors"
+                  className="flex-1 min-h-[260px] p-4 rounded-xl bg-surface-container-low border border-outline-variant text-on-surface text-sm leading-relaxed whitespace-pre-wrap overflow-y-auto cursor-text hover:border-outline transition-colors"
                 >
-                  {current.fullText || <span className="text-outline italic">Sin texto extraído</span>}
+                  {current.fullText || (
+                    <span className="text-outline italic">
+                      Sin texto extraído
+                    </span>
+                  )}
                 </div>
               )}
             </div>
