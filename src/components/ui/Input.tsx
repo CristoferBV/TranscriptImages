@@ -16,25 +16,27 @@ const Input: React.FC<InputProps> = ({
   return (
     <div className="w-full">
       {label && (
-        <label className="block text-sm font-medium text-gray-700 mb-2">
+        <label className="block text-label-md text-on-surface-variant mb-2">
           {label}
         </label>
       )}
       <input
         className={`
-          w-full px-4 py-3 border rounded-lg shadow-sm
-          focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500
+          w-full px-4 py-3 rounded-lg
+          bg-surface-container-low border
+          text-on-surface placeholder:text-outline
+          focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary
           transition-colors duration-200
-          ${error ? 'border-red-300' : 'border-gray-300'}
+          ${error ? 'border-error' : 'border-outline-variant'}
           ${className}
         `}
         {...props}
       />
       {error && (
-        <p className="mt-2 text-sm text-red-600">{error}</p>
+        <p className="mt-2 text-label-sm text-error">{error}</p>
       )}
       {helperText && !error && (
-        <p className="mt-2 text-sm text-gray-500">{helperText}</p>
+        <p className="mt-2 text-label-sm text-on-surface-variant">{helperText}</p>
       )}
     </div>
   );

@@ -65,9 +65,13 @@ export default {
 
       // ── Border Radius ─────────────────────────────────────────────────────
       borderRadius: {
-        DEFAULT: '1rem',
-        lg:      '2rem',
-        xl:      '3rem',
+        DEFAULT: '0.5rem',
+        sm:      '0.375rem',
+        md:      '0.5rem',
+        lg:      '0.75rem',
+        xl:      '1rem',
+        '2xl':   '1.25rem',
+        '3xl':   '1.5rem',
         full:    '9999px',
       },
 

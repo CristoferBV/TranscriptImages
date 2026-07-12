@@ -22,24 +22,24 @@ export const useAuthActions = () => {
     try {
       console.log('Attempting login with email:', email);
       await signInWithEmailAndPassword(auth, email, password);
-      toast.success('Welcome back!');
+      toast.success('¡Bienvenido de nuevo!');
       return { success: true };
     } catch (error: unknown) {
       console.error('Login error:', error);
-      let message = 'Login failed. Please try again.';
+      let message = 'Error al iniciar sesión. Intente de nuevo.';
       if (error && typeof error === 'object' && 'code' in error) {
         const code = (error as { code: string }).code;
         if (typeof code === 'string') {
         message = code === 'auth/user-not-found'
-          ? 'No account found with this email'
+          ? 'No se encontró una cuenta con este correo'
           : code === 'auth/wrong-password'
-          ? 'Incorrect password'
+          ? 'Contraseña incorrecta'
           : code === 'auth/invalid-email'
-          ? 'Invalid email address'
+          ? 'Correo electrónico inválido'
           : code === 'auth/invalid-credential'
-          ? 'Invalid email or password'
+          ? 'Correo o contraseña inválidos'
           : code === 'auth/too-many-requests'
-          ? 'Too many failed attempts. Please try again later.'
+          ? 'Demasiados intentos fallidos. Intente más tarde.'
           : message;
         }
       }
@@ -57,21 +57,21 @@ export const useAuthActions = () => {
       console.log('Attempting registration with email:', email);
       const result = await createUserWithEmailAndPassword(auth, email, password);
       await updateProfile(result.user, { displayName });
-      toast.success('Account created successfully!');
+      toast.success('¡Cuenta creada exitosamente!');
       return { success: true };
     } catch (error: unknown) {
       console.error('Registration error:', error);
-      let message = 'Registration failed. Please try again.';
+      let message = 'Error al registrarse. Intente de nuevo.';
       if (error && typeof error === 'object' && 'code' in error && typeof (error as { code?: unknown }).code === 'string') {
         const code = (error as { code: string }).code;
         message = code === 'auth/email-already-in-use'
-          ? 'An account with this email already exists'
+          ? 'Ya existe una cuenta con este correo'
           : code === 'auth/weak-password'
-          ? 'Password should be at least 6 characters'
+          ? 'La contraseña debe tener al menos 6 caracteres'
           : code === 'auth/invalid-email'
-          ? 'Invalid email address'
+          ? 'Correo electrónico inválido'
           : code === 'auth/operation-not-allowed'
-          ? 'Email/password accounts are not enabled. Please contact support.'
+          ? 'Las cuentas con correo/contraseña no están habilitadas. Contacte soporte.'
           : message;
       }
 
@@ -85,10 +85,10 @@ export const useAuthActions = () => {
   const logout = async () => {
     try {
       await signOut(auth);
-      toast.success('Logged out successfully');
+      toast.success('Sesión cerrada exitosamente');
     } catch (err) {
       console.error('Logout error:', err);
-      toast.error('Logout failed');
+      toast.error('Error al cerrar sesión');
     }
   };
 

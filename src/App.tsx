@@ -5,6 +5,8 @@ import { AuthProvider } from './contexts/AuthContext';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import DashboardPage from './pages/DashboardPage';
+import DocumentDetailPage from './pages/DocumentDetailPage';
+import StatsPage from './pages/StatsPage';
 import LoadingSpinner from './components/ui/LoadingSpinner';
 import FirebaseSetup from './components/ui/FirebaseSetup';
 
@@ -24,22 +26,12 @@ function AppContent() {
       <FirebaseSetup />
       <Router>
         <Routes>
-          <Route 
-            path="/login" 
-            element={user ? <Navigate to="/dashboard" replace /> : <LoginPage />} 
-          />
-          <Route 
-            path="/register" 
-            element={user ? <Navigate to="/dashboard" replace /> : <RegisterPage />} 
-          />
-          <Route 
-            path="/dashboard" 
-            element={user ? <DashboardPage /> : <Navigate to="/login" replace />} 
-          />
-          <Route 
-            path="/" 
-            element={<Navigate to={user ? "/dashboard" : "/login"} replace />} 
-          />
+          <Route path="/login" element={user ? <Navigate to="/dashboard" replace /> : <LoginPage />} />
+          <Route path="/register" element={user ? <Navigate to="/dashboard" replace /> : <RegisterPage />} />
+          <Route path="/dashboard" element={user ? <DashboardPage /> : <Navigate to="/login" replace />} />
+          <Route path="/document/:id" element={user ? <DocumentDetailPage /> : <Navigate to="/login" replace />} />
+          <Route path="/stats" element={user ? <StatsPage /> : <Navigate to="/login" replace />} />
+          <Route path="/" element={<Navigate to={user ? "/dashboard" : "/login"} replace />} />
         </Routes>
       </Router>
       <Toaster

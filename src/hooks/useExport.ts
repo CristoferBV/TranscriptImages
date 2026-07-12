@@ -5,55 +5,47 @@ import { ProjectData } from './useFirestore';
 import toast from 'react-hot-toast';
 
 export const useExport = () => {
-  const [exporting, setExporting] = useState(false);
+  const [exportingPDF, setExportingPDF] = useState(false);
+  const [exportingExcel, setExportingExcel] = useState(false);
 
   const exportToPDF = async (project: ProjectData): Promise<void> => {
-    setExporting(true);
+    setExportingPDF(true);
     try {
       const generatePDF = httpsCallable(functions, 'generatePDF');
       const result = await generatePDF({ project });
-      const { downloadUrl, filename } = result.data as { downloadUrl: string; filename?: string };
-
-      const link = document.createElement('a');
-      link.href = downloadUrl;
-      link.download = filename || `${project.title || 'project'}.pdf`;
-      link.target = '_self';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-
-      toast.success('PDF exported successfully');
+      const { downloadUrl } = result.data as { downloadUrl: string; filename: string };
+      // Abrir en nueva pestaña para vista previa
+      window.open(downloadUrl, '_blank');
+      toast.success('PDF listo para visualizar');
     } catch (error) {
       console.error('Error exporting PDF:', error);
-      toast.error('Failed to export PDF');
+      toast.error('Error al exportar PDF');
     } finally {
-      setExporting(false);
+      setExportingPDF(false);
     }
   };
 
   const exportToExcel = async (project: ProjectData): Promise<void> => {
-    setExporting(true);
+    setExportingExcel(true);
     try {
       const generateExcel = httpsCallable(functions, 'generateExcel');
       const result = await generateExcel({ project });
-      const { downloadUrl, filename } = result.data as { downloadUrl: string; filename?: string };
-
+      const { downloadUrl, filename } = result.data as { downloadUrl: string; filename: string };
+      // Descargar directamente
       const link = document.createElement('a');
       link.href = downloadUrl;
-      link.download = filename || `${project.title || 'project'}.xlsx`;
-      link.target = '_self';
+      link.download = filename;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-
-      toast.success('Excel file exported successfully');
+      toast.success('Excel exportado correctamente');
     } catch (error) {
       console.error('Error exporting Excel:', error);
-      toast.error('Failed to export Excel file');
+      toast.error('Error al exportar Excel');
     } finally {
-      setExporting(false);
+      setExportingExcel(false);
     }
   };
 
-  return { exportToPDF, exportToExcel, exporting };
+  return { exportToPDF, exportToExcel, exportingPDF, exportingExcel };
 };

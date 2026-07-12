@@ -1,119 +1,100 @@
 import React from 'react';
-import { FileText, Download, Calendar, Edit, Trash2 } from 'lucide-react';
-import Button from '../ui/Button';
-import Card from '../ui/Card';
+import { useNavigate } from 'react-router-dom';
+import { Calendar, AlignLeft, Trash2, ArrowRight, Images } from 'lucide-react';
 import { ProjectData } from '../../hooks/useFirestore';
-import { useExport } from '../../hooks/useExport';
 
 interface ProjectCardProps {
   project: ProjectData;
-  onEdit?: (project: ProjectData) => void;
   onDelete?: (project: ProjectData) => void;
 }
 
-const ProjectCard: React.FC<ProjectCardProps> = ({ project, onEdit, onDelete }) => {
-  const { exportToPDF, exportToExcel, exporting } = useExport();
+const formatDate = (timestamp: any): string => {
+  if (!timestamp) return '';
+  const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+  return new Intl.DateTimeFormat('es-CR', {
+    year: 'numeric', month: 'short', day: 'numeric',
+  }).format(date);
+};
 
-  const formatDate = (timestamp: any) => {
-    if (!timestamp) return '';
-    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
-    return new Intl.DateTimeFormat('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    }).format(date);
+const totalWords = (project: ProjectData) => {
+  const text = project.pages.map(p => p.fullText).join(' ');
+  return text.trim() ? text.trim().split(/\s+/).length : 0;
+};
+
+const ProjectCard: React.FC<ProjectCardProps> = ({ project, onDelete }) => {
+  const navigate = useNavigate();
+  const firstImage = project.pages[0]?.imageUrl;
+  const previewText = project.pages.map(p => p.fullText).join(' ').trim();
+
+  const handleDelete = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onDelete?.(project);
   };
 
   return (
-    <Card className="hover:shadow-lg transition-all duration-200 transform hover:-translate-y-1">
-      <div className="flex flex-col space-y-4">
-        {/* Project Image */}
-        <div className="aspect-video bg-gray-100 rounded-lg overflow-hidden shadow-sm">
-          <img src={project.imageUrl} alt={project.title} className="w-full h-full object-cover" />
-        </div>
-
-        {/* Project Info */}
-        <div>
-          <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-2 line-clamp-2">
-            {project.title}
-          </h3>
-
-          <div className="flex items-center text-xs sm:text-sm text-gray-500 mb-3">
-            <Calendar className="w-4 h-4 mr-1" />
-            <span className="truncate">{formatDate(project.updatedAt)}</span>
+    <div
+      onClick={() => navigate(`/document/${project.id}`)}
+      className="group bg-surface-container border border-outline-variant rounded-lg overflow-hidden cursor-pointer hover:border-primary/30 transition-all duration-200 hover:-translate-y-0.5"
+    >
+      {/* Imagen */}
+      <div className="aspect-video bg-surface-container-high overflow-hidden relative">
+        {firstImage && (
+          <img
+            src={firstImage}
+            alt={project.title}
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+          />
+        )}
+        {/* Badge páginas */}
+        {project.pages.length > 1 && (
+          <div className="absolute top-2 right-2 flex items-center gap-1 bg-black/60 backdrop-blur-sm text-white text-[10px] font-medium px-2 py-1 rounded-full">
+            <Images className="w-3 h-3" />
+            {project.pages.length} págs.
           </div>
-
-          {/* Content Summary */}
-          <div className="grid grid-cols-3 gap-2 text-xs sm:text-sm mb-4">
-            <div className="text-center p-2 sm:p-3 bg-blue-50 rounded-lg">
-              <div className="font-bold text-lg sm:text-xl text-blue-800">{project.materials.length}</div>
-              <div className="text-blue-600 font-medium">Materials</div>
-            </div>
-            <div className="text-center p-2 sm:p-3 bg-green-50 rounded-lg">
-              <div className="font-bold text-lg sm:text-xl text-green-800">{project.measurements.length}</div>
-              <div className="text-green-600 font-medium">Measures</div>
-            </div>
-            <div className="text-center p-2 sm:p-3 bg-orange-50 rounded-lg">
-              <div className="font-bold text-lg sm:text-xl text-orange-800">{project.instructions.length}</div>
-              <div className="text-orange-600 font-medium">Steps</div>
-            </div>
-          </div>
-        </div>
-
-        {/* Actions */}
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between pt-4 border-t border-gray-200 space-y-2 sm:space-y-0">
-          {/* Left: Delete */}
-          <div className="flex items-center gap-2 w-full sm:w-auto">
-            {onEdit && (
-              <Button variant="ghost" size="sm" onClick={() => onEdit(project)} className="w-full sm:w-auto">
-                <Edit className="w-4 h-4 mr-1" />
-                Edit
-              </Button>
-            )}
-
-            {onDelete && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => onDelete(project)}
-                className="w-full sm:w-auto text-red-600 hover:text-red-700 hover:bg-red-50"
-              >
-                <Trash2 className="w-4 h-4 mr-1" />
-                Delete
-              </Button>
-            )}
-          </div>
-
-          {/* Right: Export */}
-          <div className="flex items-center space-x-2 w-full sm:w-auto">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => exportToPDF(project)}
-              loading={exporting}
-              disabled={exporting}
-              className="flex-1 sm:flex-none"
-            >
-              <FileText className="w-4 h-4 mr-1" />
-              PDF
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => exportToExcel(project)}
-              loading={exporting}
-              disabled={exporting}
-              className="flex-1 sm:flex-none"
-            >
-              <Download className="w-4 h-4 mr-1" />
-              Excel
-            </Button>
-          </div>
+        )}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
+        <div className="absolute bottom-3 right-3 w-7 h-7 rounded-full bg-primary/90 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-200 translate-y-1 group-hover:translate-y-0">
+          <ArrowRight className="w-3.5 h-3.5 text-on-primary" />
         </div>
       </div>
-    </Card>
+
+      {/* Info */}
+      <div className="p-4 space-y-3">
+        <h3 className="text-sm font-semibold text-on-surface line-clamp-1 group-hover:text-primary transition-colors">
+          {project.title}
+        </h3>
+
+        <div className="flex items-center justify-between text-xs text-on-surface-variant">
+          <div className="flex items-center gap-1">
+            <Calendar className="w-3 h-3 shrink-0" />
+            <span>{formatDate(project.updatedAt)}</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <AlignLeft className="w-3 h-3 shrink-0" />
+            <span>{totalWords(project)} palabras</span>
+          </div>
+        </div>
+
+        {previewText && (
+          <p className="text-xs text-on-surface-variant line-clamp-2 leading-relaxed">
+            {previewText}
+          </p>
+        )}
+
+        <div className="flex items-center justify-between pt-2 border-t border-outline-variant/50">
+          <span className="text-xs text-primary/70 font-medium">Ver documento →</span>
+          {onDelete && (
+            <button
+              onClick={handleDelete}
+              aria-label="Eliminar"
+              className="p-1.5 rounded-lg text-on-surface-variant hover:text-error hover:bg-error-container/20 transition-colors"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
   );
 };
 

@@ -1,58 +1,64 @@
-// src/hooks/useOCR.ts
 import { useState } from 'react';
 import { httpsCallable } from 'firebase/functions';
 import { functions } from '../config/firebase';
+import { ProjectPage } from './useFirestore';
 import toast from 'react-hot-toast';
 
 export interface OCRResult {
   fullText: string;
-  materials: string[];
-  measurements: string[];
-  instructions: string[];
-  category: string | null;
-  relevant: boolean;
 }
 
 type ProcessOCRPayload = { imageUrl: string };
 
-// Si quieres, expón también el último resultado
 export const useOCR = () => {
   const [processing, setProcessing] = useState(false);
-  const [lastResult, setLastResult] = useState<OCRResult | null>(null);
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
 
-  const processImage = async (imageUrl: string): Promise<OCRResult | null> => {
+  const processImage = async (imageUrl: string): Promise<string> => {
+    const processOCR = httpsCallable<ProcessOCRPayload, OCRResult>(functions, 'processOCR');
+    const { data } = await processOCR({ imageUrl });
+    return data.fullText || '';
+  };
+
+  const processImages = async (imageUrls: string[]): Promise<ProjectPage[]> => {
     setProcessing(true);
-    try {
-      // Tipa el callable para mejor DX
-      const processOCR = httpsCallable<ProcessOCRPayload, OCRResult>(functions, 'processOCR');
-      const { data } = await processOCR({ imageUrl });
+    setProgress({ done: 0, total: imageUrls.length });
+    const pages: ProjectPage[] = [];
 
-      // Regla: si no es relevante, avisa y normaliza a arreglos vacíos
-      if (!data.relevant) {
-        toast('No se detectó información de carpintería/cortes/instalación.', { icon: 'ℹ️' });
-        const normalized: OCRResult = {
-          fullText: data.fullText || '',
-          materials: [],
-          measurements: [],
-          instructions: [],
-          category: null,
-          relevant: false,
-        };
-        setLastResult(normalized);
-        return normalized;
+    try {
+      // Procesar en lotes de 3 para no saturar la API
+      const BATCH = 3;
+      for (let i = 0; i < imageUrls.length; i += BATCH) {
+        const batch = imageUrls.slice(i, i + BATCH);
+        const results = await Promise.allSettled(batch.map(processImage));
+
+        results.forEach((result, idx) => {
+          pages.push({
+            imageUrl: batch[idx],
+            fullText: result.status === 'fulfilled' ? result.value : '',
+          });
+        });
+
+        setProgress({ done: Math.min(i + BATCH, imageUrls.length), total: imageUrls.length });
       }
 
-      toast.success('Texto extraído correctamente');
-      setLastResult(data);
-      return data;
+      const failed = pages.filter(p => !p.fullText).length;
+      if (failed > 0) {
+        toast(`${failed} imagen(es) no generaron texto detectable.`, { icon: 'ℹ️' });
+      } else {
+        toast.success('Texto extraído correctamente');
+      }
+
+      return pages;
     } catch (error) {
-      console.error('Error processing OCR:', error);
-      toast.error('No se pudo extraer texto de la imagen');
-      return null;
+      console.error('Error processing images:', error);
+      toast.error('No se pudo extraer texto de las imágenes');
+      return pages;
     } finally {
       setProcessing(false);
+      setProgress(null);
     }
   };
 
-  return { processImage, processing, lastResult };
+  return { processImages, processing, progress };
 };

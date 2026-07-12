@@ -8,32 +8,42 @@ export const useImageUpload = () => {
   const [uploading, setUploading] = useState(false);
   const { user } = useAuthState();
 
-  const uploadImage = async (file: File): Promise<string | null> => {
+  const uploadImage = async (file: File, silent = false): Promise<string | null> => {
     if (!user) {
-      toast.error('You must be logged in to upload images');
+      if (!silent) toast.error('Debe iniciar sesión para subir imágenes');
       return null;
     }
-
-    setUploading(true);
-    
     try {
-      const timestamp = Date.now();
-      const fileName = `${user.uid}/${timestamp}-${file.name}`;
+      const fileName = `${user.uid}/${Date.now()}-${file.name}`;
       const storageRef = ref(storage, `images/${fileName}`);
-      
       const snapshot = await uploadBytes(storageRef, file);
-      const downloadURL = await getDownloadURL(snapshot.ref);
-      
-      toast.success('Image uploaded successfully');
-      return downloadURL;
+      return await getDownloadURL(snapshot.ref);
     } catch (error) {
       console.error('Error uploading image:', error);
-      toast.error('Failed to upload image');
       return null;
+    }
+  };
+
+  const uploadImages = async (files: File[]): Promise<string[]> => {
+    if (!user) {
+      toast.error('Debe iniciar sesión para subir imágenes');
+      return [];
+    }
+    setUploading(true);
+    try {
+      const results = await Promise.allSettled(files.map(f => uploadImage(f, true)));
+      const urls = results
+        .filter((r): r is PromiseFulfilledResult<string> => r.status === 'fulfilled' && r.value !== null)
+        .map(r => r.value);
+
+      if (urls.length !== files.length) {
+        toast.error(`${files.length - urls.length} imagen(es) no se pudieron subir`);
+      }
+      return urls;
     } finally {
       setUploading(false);
     }
   };
 
-  return { uploadImage, uploading };
+  return { uploadImage, uploadImages, uploading };
 };

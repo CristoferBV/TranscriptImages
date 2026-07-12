@@ -1,183 +1,182 @@
 import React, { useState } from 'react';
-import { Edit3, Save, X } from 'lucide-react';
+import { Save, X, FileText, Edit3, Check, ChevronLeft, ChevronRight } from 'lucide-react';
 import Button from '../ui/Button';
-import Card from '../ui/Card';
-import { OCRResult } from '../../hooks/useOCR';
+import { ProjectPage } from '../../hooks/useFirestore';
 
 interface OCRResultsProps {
-  result: OCRResult;
-  onSave: (data: OCRResult) => void;
+  pages: ProjectPage[];
+  projectTitle: string;
+  onTitleChange: (title: string) => void;
+  onSave: (pages: ProjectPage[]) => void;
   onClose: () => void;
   saving?: boolean;
 }
 
 const OCRResults: React.FC<OCRResultsProps> = ({
-  result,
+  pages,
+  projectTitle,
+  onTitleChange,
   onSave,
   onClose,
   saving = false,
 }) => {
-  const [editingData, setEditingData] = useState<OCRResult>(result);
-  const [editingSection, setEditingSection] = useState<string | null>(null);
+  const [editedPages, setEditedPages] = useState<ProjectPage[]>(pages);
+  const [activePage, setActivePage] = useState(0);
+  const [isEditing, setIsEditing] = useState(false);
 
-  const handleArrayEdit = (
-    section: keyof Pick<OCRResult, 'materials' | 'measurements' | 'instructions'>,
-    value: string
-  ) => {
-    const items = value.split('\n').filter((item) => item.trim() !== '');
-    setEditingData((prev) => ({ ...prev, [section]: items }));
+  const current = editedPages[activePage];
+  const wordCount = current.fullText.trim() ? current.fullText.trim().split(/\s+/).length : 0;
+
+  const updateText = (text: string) => {
+    setEditedPages(prev =>
+      prev.map((p, i) => i === activePage ? { ...p, fullText: text } : p)
+    );
   };
 
-  const handleSave = () => onSave(editingData);
-
-  const sections = [
-    {
-      key: 'materials',
-      title: 'Materials',
-      color: 'bg-blue-50 border-blue-200',
-      textColor: 'text-blue-800',
-    },
-    {
-      key: 'measurements',
-      title: 'Measurements',
-      color: 'bg-green-50 border-green-200',
-      textColor: 'text-green-800',
-    },
-    {
-      key: 'instructions',
-      title: 'Installation Instructions',
-      color: 'bg-orange-50 border-orange-200',
-      textColor: 'text-orange-800',
-    },
-  ] as const;
+  const isMultiPage = editedPages.length > 1;
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center p-0 sm:p-4 z-50">
-      {/* Modal */}
-      <div className="bg-white rounded-t-xl sm:rounded-lg shadow-xl w-full max-w-4xl h-[95vh] sm:h-[90vh] overflow-hidden flex flex-col">
+    <div className="fixed inset-0 bg-black/60 flex items-end sm:items-center justify-center p-0 sm:p-4 z-50">
+      <div className="bg-surface-container border border-outline-variant rounded-t-2xl sm:rounded-2xl shadow-2xl w-full max-w-3xl h-[95vh] sm:h-[90vh] flex flex-col">
+
         {/* Header */}
-        <div className="flex items-center justify-between p-4 sm:p-6 border-b border-gray-200">
-          <h2 className="text-lg sm:text-xl font-semibold text-gray-900">
-            Extracted Content
-          </h2>
-          <button
-            onClick={onClose}
-            className="p-2 hover:bg-gray-100 rounded-full transition-colors touch-manipulation"
-            aria-label="Close"
-          >
+        <div className="flex items-center justify-between px-5 py-4 border-b border-outline-variant shrink-0">
+          <div className="flex items-center gap-2">
+            <FileText className="w-5 h-5 text-primary" />
+            <span className="text-base font-semibold text-on-surface">Texto extraído</span>
+            {isMultiPage && (
+              <span className="text-xs bg-primary/15 text-primary px-2 py-0.5 rounded-full">
+                {editedPages.length} páginas
+              </span>
+            )}
+          </div>
+          <button onClick={onClose} aria-label="Cerrar" className="p-2 hover:bg-surface-container-high rounded-full transition-colors text-on-surface-variant hover:text-on-surface">
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Body (scrolleable) */}
-        <div className="flex-1 p-4 sm:p-6 space-y-4 sm:space-y-6 overflow-y-auto">
-          {/* Full Text */}
-          <Card>
-            <div className="flex items-center justify-between mb-3 sm:mb-4">
-              <h3 className="text-base sm:text-lg font-medium text-gray-900">
-                Full Text
-              </h3>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() =>
-                  setEditingSection(
-                    editingSection === 'fullText' ? null : 'fullText'
-                  )
-                }
-                className="touch-manipulation"
-              >
-                <Edit3 className="w-4 h-4" />
-              </Button>
+        {/* Body */}
+        <div className="flex-1 flex flex-col gap-4 p-5 overflow-y-auto min-h-0">
+
+          {/* Título */}
+          <div>
+            <label className="block text-label-md text-on-surface-variant mb-2">Nombre del proyecto</label>
+            <input
+              type="text"
+              value={projectTitle}
+              onChange={(e) => onTitleChange(e.target.value)}
+              placeholder="Ej. Factura enero, Contrato, Receta..."
+              className="w-full px-4 py-3 rounded-xl bg-surface-container-low border border-outline-variant text-on-surface placeholder:text-outline focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-colors"
+            />
+          </div>
+
+          {/* Navegación de páginas */}
+          {isMultiPage && (
+            <div className="flex items-center gap-2 overflow-x-auto pb-1">
+              {editedPages.map((p, i) => (
+                <button
+                  key={i}
+                  onClick={() => { setActivePage(i); setIsEditing(false); }}
+                  className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors shrink-0 ${
+                    activePage === i
+                      ? 'bg-primary/15 text-primary border border-primary/30'
+                      : 'bg-surface-container-high text-on-surface-variant hover:text-on-surface'
+                  }`}
+                >
+                  <img src={p.imageUrl} alt="" className="w-5 h-5 rounded object-cover" />
+                  Página {i + 1}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Vista de la página activa */}
+          <div className="flex flex-col sm:flex-row gap-4 flex-1 min-h-0">
+
+            {/* Miniatura de imagen */}
+            <div className="sm:w-40 shrink-0">
+              <img
+                src={current.imageUrl}
+                alt={`Página ${activePage + 1}`}
+                className="w-full sm:w-40 h-32 sm:h-full object-cover rounded-xl border border-outline-variant"
+              />
             </div>
 
-            {editingSection === 'fullText' ? (
-              <textarea
-                value={editingData.fullText}
-                onChange={(e) =>
-                  setEditingData((prev) => ({
-                    ...prev,
-                    fullText: e.target.value,
-                  }))
-                }
-                className="w-full h-32 sm:h-40 p-3 border border-gray-300 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm sm:text-base"
-              />
-            ) : (
-              <p className="text-sm sm:text-base text-gray-700 whitespace-pre-wrap bg-gray-50 p-3 rounded-lg">
-                {editingData.fullText || 'No text extracted'}
-              </p>
-            )}
-          </Card>
-
-          {/* Secciones categorizadas */}
-          {sections.map(({ key, title, color, textColor }) => (
-            <Card key={key} className={color}>
-              <div className="flex items-center justify-between mb-3 sm:mb-4">
-                <h3 className={`text-base sm:text-lg font-medium ${textColor}`}>
-                  {title}
-                </h3>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() =>
-                    setEditingSection(editingSection === key ? null : key)
-                  }
-                  className="touch-manipulation"
+            {/* Texto */}
+            <div className="flex-1 flex flex-col min-h-0">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs text-on-surface-variant">
+                  {isMultiPage ? `Página ${activePage + 1} · ` : ''}{wordCount} palabras
+                </span>
+                <button
+                  onClick={() => setIsEditing(v => !v)}
+                  className={`flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full transition-colors ${
+                    isEditing
+                      ? 'bg-primary/15 text-primary'
+                      : 'bg-surface-container-high text-on-surface-variant hover:text-on-surface'
+                  }`}
                 >
-                  <Edit3 className="w-4 h-4" />
-                </Button>
+                  {isEditing ? <><Check className="w-3.5 h-3.5" />Listo</> : <><Edit3 className="w-3.5 h-3.5" />Editar</>}
+                </button>
               </div>
 
-              {editingSection === key ? (
+              {isEditing ? (
                 <textarea
-                  value={editingData[key].join('\n')}
-                  onChange={(e) => handleArrayEdit(key, e.target.value)}
-                  className="w-full h-32 sm:h-40 p-3 border border-gray-300 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm sm:text-base"
-                  placeholder={`Enter ${title.toLowerCase()}, one per line`}
+                  value={current.fullText}
+                  onChange={(e) => updateText(e.target.value)}
+                  autoFocus
+                  className="flex-1 w-full min-h-[180px] p-4 rounded-xl resize-none bg-surface-container-low border border-primary/50 ring-2 ring-primary/20 text-on-surface text-sm leading-relaxed focus:outline-none"
                 />
               ) : (
-                <div className="space-y-2 sm:space-y-3">
-                  {editingData[key].length > 0 ? (
-                    editingData[key].map((item, index) => (
-                      <div
-                        key={index}
-                        className="bg-white p-2 sm:p-3 rounded-lg border shadow-sm"
-                      >
-                        {item}
-                      </div>
-                    ))
-                  ) : (
-                    <p className="text-sm text-gray-500 italic">
-                      No {title.toLowerCase()} identified
-                    </p>
-                  )}
+                <div
+                  onClick={() => setIsEditing(true)}
+                  className="flex-1 min-h-[180px] p-4 rounded-xl bg-surface-container-low border border-outline-variant text-on-surface text-sm leading-relaxed whitespace-pre-wrap overflow-y-auto cursor-text hover:border-outline transition-colors"
+                >
+                  {current.fullText || <span className="text-outline italic">Sin texto extraído</span>}
                 </div>
               )}
-            </Card>
-          ))}
+            </div>
+          </div>
+
+          {/* Navegación prev/next en móvil */}
+          {isMultiPage && (
+            <div className="flex items-center justify-between sm:hidden">
+              <button
+                onClick={() => { setActivePage(p => Math.max(0, p - 1)); setIsEditing(false); }}
+                disabled={activePage === 0}
+                className="flex items-center gap-1 text-sm text-on-surface-variant disabled:opacity-30 hover:text-on-surface transition-colors"
+              >
+                <ChevronLeft className="w-4 h-4" /> Anterior
+              </button>
+              <span className="text-xs text-on-surface-variant">{activePage + 1} / {editedPages.length}</span>
+              <button
+                onClick={() => { setActivePage(p => Math.min(editedPages.length - 1, p + 1)); setIsEditing(false); }}
+                disabled={activePage === editedPages.length - 1}
+                className="flex items-center gap-1 text-sm text-on-surface-variant disabled:opacity-30 hover:text-on-surface transition-colors"
+              >
+                Siguiente <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+          )}
         </div>
 
-        {/* Footer (stickied) */}
+        {/* Footer */}
         <div
-          className="sticky bottom-0 border-t border-gray-200 bg-white p-3 sm:p-4"
-          style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 0.5rem)' }}
+          className="shrink-0 border-t border-outline-variant bg-surface-container px-5 py-4"
+          style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 1rem)' }}
         >
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-end gap-2 sm:gap-3">
-            <Button
-              variant="outline"
-              onClick={onClose}
-              className="w-full sm:w-auto border-gray-300 text-gray-700 hover:bg-gray-100"
-            >
-              Cancel
+          <div className="flex items-center gap-3">
+            <Button variant="outline" onClick={onClose} className="flex-1 sm:flex-none">
+              Cancelar
             </Button>
-
             <Button
-              onClick={handleSave}
+              onClick={() => onSave(editedPages)}
               loading={saving}
-              className="w-full sm:w-auto bg-blue-600/90 hover:bg-blue-600 text-white shadow-md hover:shadow-lg"
+              disabled={editedPages.every(p => !p.fullText.trim())}
+              className="flex-1 sm:flex-none"
             >
               <Save className="w-4 h-4 mr-2" />
-              Save Project
+              Guardar proyecto
             </Button>
           </div>
         </div>
