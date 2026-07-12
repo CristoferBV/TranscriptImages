@@ -100,6 +100,7 @@ export const useCamera = () => {
 
   return {
     videoRef,
+    streamRef,
     isCapturing,
     hasPermission,
     requestCameraPermission,

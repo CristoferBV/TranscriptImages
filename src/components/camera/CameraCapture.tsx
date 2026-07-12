@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
-import { Camera, Upload, X, Plus, ImageIcon } from 'lucide-react';
+import { Camera, Upload, X, Plus, ImageIcon, Check, RotateCcw, ChevronRight } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Button from '../ui/Button';
 import Card from '../ui/Card';
@@ -13,9 +13,12 @@ interface CameraCaptureProps {
   onClose: () => void;
 }
 
+type MobileScreen = 'camera' | 'preview' | 'gallery';
+
 const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => {
   const {
     videoRef,
+    streamRef,
     isCapturing,
     hasPermission,
     requestCameraPermission,
@@ -26,10 +29,18 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
   const isMobile = useIsMobile();
   const toastShownRef = useRef(false);
 
+  // Desktop state
   const [showLoading, setShowLoading] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState('Subiendo imágenes...');
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [previews, setPreviews] = useState<string[]>([]);
+
+  // Mobile state
+  const [mobileScreen, setMobileScreen] = useState<MobileScreen>('camera');
+  const [previewFile, setPreviewFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [capturedFiles, setCapturedFiles] = useState<File[]>([]);
+  const [capturedPreviews, setCapturedPreviews] = useState<string[]>([]);
 
   const showCameraError = useCallback((reason: string) => {
     if (toastShownRef.current) return;
@@ -43,8 +54,10 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
 
   const handleClose = useCallback(() => {
     previews.forEach(URL.revokeObjectURL);
+    capturedPreviews.forEach(URL.revokeObjectURL);
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
     try { stopCamera(); } finally { onClose(); }
-  }, [stopCamera, onClose, previews]);
+  }, [stopCamera, onClose, previews, capturedPreviews, previewUrl]);
 
   useEffect(() => {
     if (!isMobile) return;
@@ -55,6 +68,14 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
     return () => { stopCamera(); };
   }, [isMobile]);
 
+  // Reconectar stream al video cada vez que se vuelve a la pantalla de cámara
+  useEffect(() => {
+    if (!isMobile || mobileScreen !== 'camera') return;
+    if (videoRef.current && streamRef.current) {
+      videoRef.current.srcObject = streamRef.current;
+    }
+  }, [mobileScreen, isMobile]);
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && !showLoading) { e.preventDefault(); handleClose(); }
@@ -63,20 +84,17 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
     return () => window.removeEventListener('keydown', onKey);
   }, [handleClose, showLoading]);
 
+  // ── Desktop helpers ──────────────────────────────────────────────────────
   const addFiles = (newFiles: File[]) => {
     const imageFiles = newFiles.filter(f => f.type.startsWith('image/'));
     const remaining = MAX_IMAGES - selectedFiles.length;
-    if (remaining <= 0) {
-      toast.error(`Máximo ${MAX_IMAGES} imágenes por proyecto`);
-      return;
-    }
+    if (remaining <= 0) { toast.error(`Máximo ${MAX_IMAGES} imágenes por proyecto`); return; }
     const toAdd = imageFiles.slice(0, remaining);
     if (imageFiles.length > remaining) {
       toast(`Solo se agregaron ${remaining} imagen(es). Límite: ${MAX_IMAGES}`, { icon: 'ℹ️' });
     }
-    const newPreviews = toAdd.map(f => URL.createObjectURL(f));
     setSelectedFiles(prev => [...prev, ...toAdd]);
-    setPreviews(prev => [...prev, ...newPreviews]);
+    setPreviews(prev => [...prev, ...toAdd.map(f => URL.createObjectURL(f))]);
   };
 
   const removeFile = (index: number) => {
@@ -95,47 +113,78 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
     if (!selectedFiles.length) return;
     setShowLoading(true);
     setLoadingMessage('Subiendo imágenes...');
-    try {
-      await Promise.resolve(onCapture(selectedFiles));
-    } finally {
-      setShowLoading(false);
-      handleClose();
-    }
+    try { await Promise.resolve(onCapture(selectedFiles)); }
+    finally { setShowLoading(false); handleClose(); }
   };
 
-  // ── Mobile capture ──────────────────────────────────────────────────────
-  const handleCapture = async () => {
-    setShowLoading(true);
-    setLoadingMessage('Escaneando...');
+  // ── Mobile: capture → preview ────────────────────────────────────────────
+  const handleMobileCapture = async () => {
     const file = await capturePhoto();
-    if (!file) { setShowLoading(false); return; }
-    try {
-      await Promise.resolve(onCapture([file]));
-    } finally {
-      setShowLoading(false);
-      handleClose();
-    }
+    if (!file) return;
+    const url = URL.createObjectURL(file);
+    setPreviewFile(file);
+    setPreviewUrl(url);
+    setMobileScreen('preview');
   };
 
-  const handleMobileFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !file.type.startsWith('image/')) return;
+  // Confirm preview → add to gallery
+  const handleConfirmPhoto = () => {
+    if (!previewFile || !previewUrl) return;
+    if (capturedFiles.length >= MAX_IMAGES) {
+      toast.error(`Máximo ${MAX_IMAGES} imágenes`);
+      URL.revokeObjectURL(previewUrl);
+      setPreviewFile(null); setPreviewUrl(null);
+      setMobileScreen('camera');
+      return;
+    }
+    setCapturedFiles(prev => [...prev, previewFile]);
+    setCapturedPreviews(prev => [...prev, previewUrl]);
+    setPreviewFile(null); setPreviewUrl(null);
+    setMobileScreen('gallery');
+  };
+
+  // Retake — discard preview, go back to camera
+  const handleRetake = () => {
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    setPreviewFile(null); setPreviewUrl(null);
+    setMobileScreen('camera');
+  };
+
+  // Remove from gallery
+  const removeCaptured = (index: number) => {
+    URL.revokeObjectURL(capturedPreviews[index]);
+    setCapturedFiles(prev => prev.filter((_, i) => i !== index));
+    setCapturedPreviews(prev => prev.filter((_, i) => i !== index));
+  };
+
+  // Process all captured
+  const handleMobileProcess = async () => {
+    if (!capturedFiles.length) return;
     setShowLoading(true);
-    setLoadingMessage('Subiendo imagen...');
-    try {
-      await Promise.resolve(onCapture([file]));
-    } finally {
-      setShowLoading(false);
-      handleClose();
-    }
+    setLoadingMessage('Procesando imágenes...');
+    try { await Promise.resolve(onCapture(capturedFiles)); }
+    finally { setShowLoading(false); handleClose(); }
   };
 
-  // ── Desktop ─────────────────────────────────────────────────────────────
+  // Upload from gallery (mobile)
+  const handleMobileFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []).filter(f => f.type.startsWith('image/'));
+    if (!files.length) return;
+    const remaining = MAX_IMAGES - capturedFiles.length;
+    const toAdd = files.slice(0, remaining);
+    if (files.length > remaining) toast(`Solo se agregaron ${remaining} imagen(es).`, { icon: 'ℹ️' });
+    const urls = toAdd.map(f => URL.createObjectURL(f));
+    setCapturedFiles(prev => [...prev, ...toAdd]);
+    setCapturedPreviews(prev => [...prev, ...urls]);
+    if (mobileScreen === 'camera') setMobileScreen('gallery');
+    e.target.value = '';
+  };
+
+  // ── Desktop ──────────────────────────────────────────────────────────────
   if (!isMobile) {
     return (
       <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50">
         <Card className="w-full max-w-2xl">
-          {/* Header */}
           <div className="flex items-center justify-between mb-6">
             <div>
               <h3 className="text-lg font-semibold text-on-surface">Cargar imágenes</h3>
@@ -143,11 +192,8 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
                 {selectedFiles.length}/{MAX_IMAGES} imágenes seleccionadas
               </p>
             </div>
-            <button
-              onClick={handleClose}
-              aria-label="Cerrar"
-              className="p-2 hover:bg-surface-container-high rounded-full transition-colors text-on-surface-variant hover:text-on-surface"
-            >
+            <button onClick={handleClose} aria-label="Cerrar"
+              className="p-2 hover:bg-surface-container-high rounded-full transition-colors text-on-surface-variant hover:text-on-surface">
               <X className="w-5 h-5" />
             </button>
           </div>
@@ -158,7 +204,6 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
               <p className="text-sm">{loadingMessage}</p>
             </div>
           ) : selectedFiles.length === 0 ? (
-            /* Drop zone vacío */
             <label className="flex flex-col items-center justify-center w-full h-56 border-2 border-dashed border-outline-variant rounded-xl cursor-pointer hover:border-primary hover:bg-primary/5 transition-colors group">
               <Upload className="w-8 h-8 text-on-surface-variant group-hover:text-primary mb-3 transition-colors" />
               <span className="text-sm font-medium text-on-surface">Haz clic para seleccionar imágenes</span>
@@ -166,27 +211,19 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
               <input type="file" accept="image/*" multiple onChange={handleFileInput} className="hidden" />
             </label>
           ) : (
-            /* Grid de previews */
             <div className="space-y-4">
               <div className="grid grid-cols-3 sm:grid-cols-4 gap-3 max-h-72 overflow-y-auto pr-1">
                 {previews.map((src, i) => (
                   <div key={i} className="relative group aspect-square rounded-lg overflow-hidden bg-surface-container-high border border-outline-variant">
                     <img src={src} alt={`Imagen ${i + 1}`} className="w-full h-full object-cover" />
                     <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                      <button
-                        onClick={() => removeFile(i)}
-                        className="w-7 h-7 rounded-full bg-error flex items-center justify-center"
-                      >
+                      <button onClick={() => removeFile(i)} className="w-7 h-7 rounded-full bg-error flex items-center justify-center">
                         <X className="w-3.5 h-3.5 text-on-error" />
                       </button>
                     </div>
-                    <span className="absolute bottom-1 left-1 text-[10px] bg-black/60 text-white px-1.5 py-0.5 rounded">
-                      {i + 1}
-                    </span>
+                    <span className="absolute bottom-1 left-1 text-[10px] bg-black/60 text-white px-1.5 py-0.5 rounded">{i + 1}</span>
                   </div>
                 ))}
-
-                {/* Botón agregar más */}
                 {selectedFiles.length < MAX_IMAGES && (
                   <label className="aspect-square rounded-lg border-2 border-dashed border-outline-variant hover:border-primary hover:bg-primary/5 transition-colors cursor-pointer flex flex-col items-center justify-center gap-1">
                     <Plus className="w-5 h-5 text-on-surface-variant" />
@@ -195,7 +232,6 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
                   </label>
                 )}
               </div>
-
               <p className="text-xs text-on-surface-variant flex items-center gap-1">
                 <ImageIcon className="w-3.5 h-3.5" />
                 Cada imagen será una página del documento
@@ -203,11 +239,8 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
             </div>
           )}
 
-          {/* Footer */}
           <div className="flex items-center gap-3 mt-6">
-            <Button variant="ghost" onClick={handleClose} className="flex-1 sm:flex-none">
-              Cancelar
-            </Button>
+            <Button variant="ghost" onClick={handleClose} className="flex-1 sm:flex-none">Cancelar</Button>
             {selectedFiles.length > 0 && (
               <button onClick={handleProcess} className="btn-auth-primary flex-1 sm:flex-none px-5 py-2.5 rounded-full text-sm font-semibold flex items-center justify-center gap-2">
                 Procesar {selectedFiles.length} {selectedFiles.length === 1 ? 'imagen' : 'imágenes'}
@@ -219,7 +252,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
     );
   }
 
-  // ── Móvil: permiso denegado ─────────────────────────────────────────────
+  // ── Móvil: permiso denegado ──────────────────────────────────────────────
   if (hasPermission === false) {
     return (
       <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
@@ -228,17 +261,15 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
             <Camera className="mx-auto h-12 w-12 text-on-surface-variant mb-4" />
             <h3 className="text-lg font-medium text-on-surface mb-2">Acceso a cámara requerido</h3>
             <p className="text-sm text-on-surface-variant mb-6">
-              Por favor permite el acceso a la cámara para capturar imágenes, o sube una imagen existente.
+              Permite el acceso a la cámara o sube una imagen existente.
             </p>
             <div className="space-y-3">
               <Button onClick={() => {
                 toastShownRef.current = false;
-                requestCameraPermission().then((result) => {
-                  if (typeof result === 'string') showCameraError(result);
-                });
-              }} className="w-full">Intentar cámara de nuevo</Button>
+                requestCameraPermission().then(r => { if (typeof r === 'string') showCameraError(r); });
+              }} className="w-full">Intentar de nuevo</Button>
               <label className="relative w-full block">
-                <input type="file" accept="image/*" onChange={handleMobileFileUpload} className="hidden" />
+                <input type="file" accept="image/*" multiple onChange={handleMobileFileUpload} className="hidden" />
                 <Button variant="outline" className="w-full pointer-events-none">
                   <Upload className="w-4 h-4 mr-2" />Subir imagen
                 </Button>
@@ -251,85 +282,264 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => 
     );
   }
 
-  // ── Móvil: cámara ───────────────────────────────────────────────────────
-  return (
-    <div className="fixed inset-0 bg-black flex flex-col z-50">
-      {showLoading && (
-        <div className="absolute inset-0 z-50 grid place-items-center bg-black/70 text-white">
-          <div className="rounded-2xl bg-white/5 backdrop-blur-md ring-1 ring-white/10 px-6 py-6 text-center shadow-2xl">
-            <div className="relative mx-auto mb-4 h-20 w-20">
-              <div className="absolute inset-0 rounded-full border-2 border-white/20" />
-              <div className="absolute inset-0 rounded-full border-2 border-white/60 border-t-transparent animate-spin-slow" />
-              <div className="absolute inset-2 rounded-full bg-white/10" />
-              <div className="absolute inset-0 grid place-items-center">
-                <Camera className="h-7 w-7" />
-              </div>
-            </div>
-            <p className="text-base font-medium">{loadingMessage}</p>
-            <p className="mt-1 text-xs text-white/70">Esto puede tomar un momento</p>
-            <div className="mt-4 h-1 w-56 overflow-hidden rounded-full bg-white/15">
-              <div className="h-full w-1/3 animate-progress bg-white/80" />
+  // ── Móvil: loading overlay ───────────────────────────────────────────────
+  if (showLoading) {
+    return (
+      <div className="fixed inset-0 z-50 bg-black grid place-items-center text-white">
+        <div className="rounded-2xl bg-white/5 backdrop-blur-md ring-1 ring-white/10 px-8 py-8 text-center">
+          <div className="relative mx-auto mb-4 h-16 w-16">
+            <div className="absolute inset-0 rounded-full border-2 border-white/20" />
+            <div className="absolute inset-0 rounded-full border-2 border-white/60 border-t-transparent animate-spin-slow" />
+            <div className="absolute inset-0 grid place-items-center">
+              <Camera className="h-6 w-6" />
             </div>
           </div>
+          <p className="text-base font-medium">{loadingMessage}</p>
+          <p className="mt-1 text-xs text-white/60">Esto puede tomar un momento</p>
         </div>
-      )}
+      </div>
+    );
+  }
 
-      {/* Header */}
-      <div className="absolute top-3 md:top-5 left-0 w-full px-4 z-40">
-        <div className="flex justify-center">
-          <p className="flex items-center gap-2 text-white text-sm bg-black/60 px-3 py-1.5 rounded-full">
-            <Camera className="w-4 h-4" />
-            Posicione el documento dentro del marco
-          </p>
+  // ── Móvil: vista previa de foto recién tomada ────────────────────────────
+  if (mobileScreen === 'preview' && previewUrl) {
+    return (
+      <div className="fixed inset-0 z-50 bg-black flex flex-col">
+        {/* Header */}
+        <div className="shrink-0 px-4 pt-12 pb-4 flex items-center justify-between">
+          <span className="text-white font-medium text-sm">Vista previa</span>
+          <span className="text-white/50 text-xs">{capturedFiles.length + 1} de {MAX_IMAGES} máx.</span>
         </div>
-        <div className="absolute top-0 right-1">
+
+        {/* Imagen */}
+        <div className="flex-1 relative overflow-hidden">
+          <img src={previewUrl} alt="Vista previa" className="w-full h-full object-contain" />
+        </div>
+
+        {/* Acciones */}
+        <div className="shrink-0 px-6 py-8 flex items-center justify-between gap-4"
+          style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 2rem)' }}>
+          {/* Retomar */}
           <button
-            onClick={() => !showLoading && handleClose()}
-            aria-label="Cerrar (Esc)"
-            className="mt-1 rounded-full p-2 bg-black/55 backdrop-blur ring-1 ring-white/20 text-red-300 hover:text-red-200 hover:bg-black/70 transition shadow-lg"
+            onClick={handleRetake}
+            className="flex flex-col items-center gap-2 text-white/80 hover:text-white transition-colors"
           >
+            <div className="w-14 h-14 rounded-full bg-white/10 border border-white/20 flex items-center justify-center">
+              <RotateCcw className="w-6 h-6" />
+            </div>
+            <span className="text-xs">Retomar</span>
+          </button>
+
+          {/* Confirmar */}
+          <button
+            onClick={handleConfirmPhoto}
+            className="flex flex-col items-center gap-2"
+          >
+            <div className="w-20 h-20 rounded-full bg-primary flex items-center justify-center shadow-lg">
+              <Check className="w-9 h-9 text-[#001f28]" strokeWidth={2.5} />
+            </div>
+            <span className="text-xs text-white">Usar foto</span>
+          </button>
+
+          {/* Continuar a galería si ya hay fotos */}
+          {capturedFiles.length > 0 ? (
+            <button
+              onClick={() => setMobileScreen('gallery')}
+              className="flex flex-col items-center gap-2 text-white/80 hover:text-white transition-colors"
+            >
+              <div className="w-14 h-14 rounded-full bg-white/10 border border-white/20 flex items-center justify-center relative">
+                <ImageIcon className="w-6 h-6" />
+                <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-primary text-[#001f28] text-[10px] font-bold flex items-center justify-center">
+                  {capturedFiles.length}
+                </span>
+              </div>
+              <span className="text-xs">Galería</span>
+            </button>
+          ) : (
+            <div className="w-14" />
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // ── Móvil: galería de fotos capturadas ───────────────────────────────────
+  if (mobileScreen === 'gallery') {
+    return (
+      <div className="fixed inset-0 z-50 bg-app-bg flex flex-col">
+        {/* Header */}
+        <div className="shrink-0 auth-glass-card border-b border-white/5 px-4 h-14 flex items-center justify-between"
+          style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
+          <button onClick={handleClose} className="text-on-surface-variant hover:text-on-surface transition-colors">
             <X className="w-5 h-5" />
           </button>
+          <span className="text-sm font-semibold text-on-surface">
+            {capturedFiles.length} {capturedFiles.length === 1 ? 'foto' : 'fotos'} · máx. {MAX_IMAGES}
+          </span>
+          <div className="w-5" />
         </div>
-      </div>
 
-      {/* Video */}
-      <div className="flex-1 relative">
-        <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
-        <div className="absolute inset-0 flex items-center justify-center z-30 pt-16 pb-28">
-          <div className="relative aspect-[3/4] sm:aspect-[4/3] rounded-2xl ring-2 ring-white/40 bg-black/10 backdrop-blur-[1px] w-[min(92vw,calc((100vh-260px)*0.75))] max-h-[calc(100vh-260px)]">
-            <div className="pointer-events-none">
-              <div className="absolute top-0 left-0 w-10 h-10 border-t-[3px] border-l-[3px] border-white rounded-tl-lg" />
-              <div className="absolute top-0 right-0 w-10 h-10 border-t-[3px] border-r-[3px] border-white rounded-tr-lg" />
-              <div className="absolute bottom-0 left-0 w-10 h-10 border-b-[3px] border-l-[3px] border-white rounded-bl-lg" />
-              <div className="absolute bottom-0 right-0 w-10 h-10 border-b-[3px] border-r-[3px] border-white rounded-br-lg" />
-            </div>
-            {!showLoading && (
-              <div className="absolute left-4 right-4 top-0 scanline animate-scan rounded" />
+        {/* Grid de fotos */}
+        <div className="flex-1 overflow-y-auto p-4">
+          <div className="grid grid-cols-3 gap-2">
+            {capturedPreviews.map((src, i) => (
+              <div key={i} className="relative aspect-square rounded-lg overflow-hidden bg-surface-container-high border border-outline-variant">
+                <img src={src} alt={`Foto ${i + 1}`} className="w-full h-full object-cover" />
+                <button
+                  onClick={() => removeCaptured(i)}
+                  className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-black/70 flex items-center justify-center"
+                >
+                  <X className="w-3.5 h-3.5 text-white" />
+                </button>
+                <span className="absolute bottom-1 left-1.5 text-[10px] bg-black/60 text-white px-1.5 py-0.5 rounded font-medium">
+                  {i + 1}
+                </span>
+              </div>
+            ))}
+
+            {/* Agregar más */}
+            {capturedFiles.length < MAX_IMAGES && (
+              <button
+                onClick={() => setMobileScreen('camera')}
+                className="aspect-square rounded-lg border-2 border-dashed border-outline-variant hover:border-primary transition-colors flex flex-col items-center justify-center gap-1.5"
+              >
+                <Plus className="w-6 h-6 text-on-surface-variant" />
+                <span className="text-[10px] text-on-surface-variant">Agregar</span>
+              </button>
             )}
           </div>
+
+          <p className="text-xs text-on-surface-variant text-center mt-4 flex items-center justify-center gap-1">
+            <ImageIcon className="w-3.5 h-3.5" />
+            Cada foto será una página del documento
+          </p>
+        </div>
+
+        {/* Footer */}
+        <div className="shrink-0 px-4 py-4 border-t border-outline-variant bg-surface-container"
+          style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 1rem)' }}>
+          <div className="flex gap-3">
+            <label className="flex-none">
+              <input type="file" accept="image/*" multiple onChange={handleMobileFileUpload} className="hidden" />
+              <div className="h-11 px-4 rounded-full border border-outline-variant flex items-center gap-2 text-sm text-on-surface-variant cursor-pointer hover:bg-surface-container-high transition-colors">
+                <Upload className="w-4 h-4" />
+                Subir
+              </div>
+            </label>
+            <button
+              onClick={handleMobileProcess}
+              disabled={capturedFiles.length === 0}
+              className="btn-auth-primary flex-1 h-11 rounded-full text-sm font-semibold flex items-center justify-center gap-2 disabled:opacity-40"
+            >
+              <ChevronRight className="w-4 h-4" />
+              Procesar {capturedFiles.length} {capturedFiles.length === 1 ? 'foto' : 'fotos'}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Móvil: cámara ────────────────────────────────────────────────────────
+  return (
+    <div className="fixed inset-0 bg-black flex flex-col z-50">
+      {/* Header */}
+      <div className="absolute top-0 left-0 right-0 z-40 flex items-center justify-between px-4"
+        style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 12px)' }}>
+        <button
+          onClick={handleClose}
+          className="w-10 h-10 rounded-full bg-black/50 backdrop-blur flex items-center justify-center text-white"
+        >
+          <X className="w-5 h-5" />
+        </button>
+
+        <p className="text-white text-xs bg-black/50 backdrop-blur px-3 py-1.5 rounded-full">
+          Posiciona el documento en el marco
+        </p>
+
+        {/* Badge de fotos tomadas */}
+        {capturedFiles.length > 0 ? (
+          <button
+            onClick={() => setMobileScreen('gallery')}
+            className="w-10 h-10 rounded-full bg-black/50 backdrop-blur flex items-center justify-center relative"
+          >
+            <ImageIcon className="w-5 h-5 text-white" />
+            <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-primary text-[#001f28] text-[10px] font-bold flex items-center justify-center">
+              {capturedFiles.length}
+            </span>
+          </button>
+        ) : (
+          <div className="w-10" />
+        )}
+      </div>
+
+      {/* Video — sin blur, full screen */}
+      <video
+        ref={videoRef}
+        autoPlay
+        playsInline
+        muted
+        className="absolute inset-0 w-full h-full object-cover"
+      />
+
+      {/* Marco de encuadre — sin backdrop-blur */}
+      <div className="absolute inset-0 flex items-center justify-center"
+        style={{ paddingTop: '80px', paddingBottom: '160px' }}>
+        <div className="relative w-[85vw] max-w-sm aspect-[3/4]">
+          {/* Esquinas */}
+          <div className="absolute top-0 left-0 w-8 h-8 border-t-[3px] border-l-[3px] border-white rounded-tl-md" />
+          <div className="absolute top-0 right-0 w-8 h-8 border-t-[3px] border-r-[3px] border-white rounded-tr-md" />
+          <div className="absolute bottom-0 left-0 w-8 h-8 border-b-[3px] border-l-[3px] border-white rounded-bl-md" />
+          <div className="absolute bottom-0 right-0 w-8 h-8 border-b-[3px] border-r-[3px] border-white rounded-br-md" />
+          {/* Scanline */}
+          <div className="absolute left-3 right-3 top-0 scanline animate-scan rounded" />
         </div>
       </div>
 
-      {/* Botones móvil */}
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-40">
-        <div className="bg-gradient-to-t from-black/85 to-transparent pt-6 pb-4">
-          <div className={`pointer-events-auto flex items-center justify-center space-x-4 max-w-md mx-auto ${showLoading ? 'pointer-events-none opacity-60' : ''}`}>
-            <label className="px-7 py-3.5 bg-yellow-500/80 text-white rounded-lg shadow-md border border-transparent hover:bg-yellow-500/60 transition-all cursor-pointer flex items-center">
-              <Upload className="w-5 h-5 mr-2" />
-              Subir
-              <input type="file" accept="image/*" onChange={handleMobileFileUpload} className="hidden" />
-            </label>
-            <Button
-              onClick={handleCapture}
-              loading={isCapturing}
-              size="lg"
-              className="px-8 py-3 bg-blue-600/80 text-white rounded-lg shadow-md border border-transparent hover:bg-blue-600/60 transition-all"
+      {/* Botones inferiores */}
+      <div className="absolute inset-x-0 bottom-0 z-40"
+        style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 24px)' }}>
+        <div className="flex items-center justify-around px-10 py-4">
+
+          {/* Subir desde galería */}
+          <label className="flex flex-col items-center gap-2 cursor-pointer">
+            <div className="w-12 h-12 rounded-full bg-white/15 border border-white/30 flex items-center justify-center">
+              <Upload className="w-5 h-5 text-white" />
+            </div>
+            <span className="text-[11px] text-white/80">Subir</span>
+            <input type="file" accept="image/*" multiple onChange={handleMobileFileUpload} className="hidden" />
+          </label>
+
+          {/* Botón captura principal */}
+          <button
+            onClick={handleMobileCapture}
+            disabled={isCapturing}
+            className="relative flex items-center justify-center disabled:opacity-60"
+          >
+            <div className="w-20 h-20 rounded-full border-4 border-white flex items-center justify-center">
+              <div className={`rounded-full bg-white transition-all duration-150 ${isCapturing ? 'w-12 h-12' : 'w-16 h-16'}`} />
+            </div>
+          </button>
+
+          {/* Ver galería / placeholder */}
+          {capturedFiles.length > 0 ? (
+            <button
+              onClick={() => setMobileScreen('gallery')}
+              className="flex flex-col items-center gap-2"
             >
-              <Camera className="w-5 h-5 mr-2" />
-              Capturar
-            </Button>
-          </div>
+              <div className="w-12 h-12 rounded-lg overflow-hidden border-2 border-white relative">
+                <img src={capturedPreviews[capturedFiles.length - 1]} alt="" className="w-full h-full object-cover" />
+                {capturedFiles.length > 1 && (
+                  <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                    <span className="text-white text-xs font-bold">+{capturedFiles.length}</span>
+                  </div>
+                )}
+              </div>
+              <span className="text-[11px] text-white/80">Ver fotos</span>
+            </button>
+          ) : (
+            <div className="w-12" />
+          )}
         </div>
       </div>
     </div>
